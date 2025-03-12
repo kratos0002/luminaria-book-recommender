@@ -1,0 +1,326 @@
+/* LiteratureDiscovery - Main Stylesheet */
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #3498db;
+    --accent-color: #e74c3c;
+    --background-color: #f5f7fa;
+    --card-background: #ffffff;
+    --text-color: #333333;
+    --text-light: #7f8c8d;
+    --border-color: #ecf0f1;
+    --success-color: #27ae60;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+header h1 {
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+header p {
+    color: var(--text-light);
+}
+
+.user-input {
+    font-size: 1.2rem;
+    color: var(--secondary-color);
+    margin: 0.5rem 0 1rem;
+    font-weight: 500;
+    font-style: italic;
+}
+
+.card {
+    background-color: var(--card-background);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+input, textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.btn-primary {
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+}
+
+.btn-secondary {
+    display: inline-block;
+    background-color: var(--primary-color);
+    color: white;
+    text-decoration: none;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-secondary:hover {
+    background-color: #1a2530;
+}
+
+footer {
+    text-align: center;
+    margin-top: 2rem;
+    color: var(--text-light);
+    font-size: 0.9rem;
+}
+
+/* Recommendations Styles */
+.recommendations {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+.recommendation-card {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.recommendation-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.recommendation-card .title {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #2c3e50;
+    font-size: 1.4rem;
+}
+
+.recommendation-card .meta {
+    display: flex;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+
+.recommendation-card .meta span {
+    margin-right: 15px;
+}
+
+.recommendation-card .meta .author {
+    font-weight: 600;
+    color: #3498db;
+}
+
+.recommendation-card .meta .genre {
+    font-style: italic;
+}
+
+.recommendation-card .description {
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+/* New styles for match information */
+.match-info {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 12px;
+    margin-top: 15px;
+    border-left: 4px solid #3498db;
+}
+
+.match-score {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 5px;
+}
+
+.match-terms {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+/* Context description styles */
+.context-description {
+    background-color: #f0f7fb;
+    border-radius: 6px;
+    padding: 15px;
+    margin: 15px 0;
+    border-left: 4px solid #3498db;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: #34495e;
+}
+
+.context-description p {
+    margin: 0;
+}
+
+/* User History Styles */
+.user-history {
+    background-color: #eef2f7;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+    border-left: 4px solid #9b59b6;
+}
+
+.user-history h3 {
+    color: #8e44ad;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+}
+
+.history-list {
+    list-style-type: none;
+}
+
+.history-list li {
+    padding: 5px 0;
+    font-style: italic;
+    color: #555;
+    position: relative;
+    padding-left: 15px;
+}
+
+.history-list li:before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: #9b59b6;
+}
+
+/* Terms Used Styles */
+.terms-used {
+    background-color: #eef7f2;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+    border-left: 4px solid #27ae60;
+}
+
+.terms-used h3 {
+    color: #27ae60;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+}
+
+.terms-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.term-tag {
+    display: inline-block;
+    background-color: #2ecc71;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* Cache notice styles */
+.cache-notice {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-top: 10px;
+}
+
+.cache-hit {
+    background-color: #e8f7f0;
+    color: #27ae60;
+    border: 1px solid #d1f2e4;
+}
+
+.cache-miss {
+    background-color: #f8eaef;
+    color: #e74c3c;
+    border: 1px solid #f5d0da;
+}
+
+/* Responsive styles */
+@media (min-width: 768px) {
+    .recommendations {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 767px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    .recommendation-card {
+        padding: 15px;
+    }
+    
+    .user-history, .terms-used {
+        padding: 12px;
+    }
+    
+    .term-tag {
+        font-size: 0.8rem;
+        padding: 4px 8px;
+    }
+}

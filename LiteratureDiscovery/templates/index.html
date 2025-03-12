@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiteratureDiscovery - Find Your Next Read</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Literature Discovery</h1>
+            <p>Discover diverse literary works tailored to your interests</p>
+        </header>
+        
+        <main>
+            <div class="card">
+                <h2>What would you like to read?</h2>
+                <form action="/recommendations" method="POST">
+                    <div class="form-group">
+                        <label for="literature_input">Describe what kind of literature you'd like to read:</label>
+                        <textarea id="literature_input" name="literature_input" rows="3" 
+                                  placeholder="e.g., Crime and Punishment, time travel stories, Toni Morrison" required></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">Get Recommendations</button>
+                </form>
+            </div>
+        </main>
+        
+        <footer>
+            <p>Powered by the LiteratureDiscovery Engine &copy; 2025</p>
+        </footer>
+    </div>
+</body>
+</html>

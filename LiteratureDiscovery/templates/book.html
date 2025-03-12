@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ book.title }} | Luminaria</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* General Layout */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Header */
+        header {
+            margin-bottom: 30px;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-bottom: 15px;
+            color: #4a6fa5;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        h1 {
+            margin: 0 0 5px 0;
+            color: #2c3e50;
+            font-size: 2.2rem;
+        }
+        
+        .book-meta {
+            color: #666;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+        
+        /* Card Layout */
+        .card-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .card-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4a6fa5;
+        }
+        
+        .card h2 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 1.4rem;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        /* Match Score */
+        .match-score {
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 20px;
+            display: inline-block;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+        
+        .score-high {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .score-medium {
+            background-color: #fff8e1;
+            color: #f57f17;
+        }
+        
+        .score-low {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        
+        /* Lists */
+        .list-item {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .list-item:last-child {
+            border-bottom: none;
+        }
+        
+        .list-item .source {
+            font-weight: bold;
+            color: #4a6fa5;
+        }
+        
+        .list-item .date {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        
+        /* Quotes */
+        .quote {
+            font-style: italic;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        
+        .quote::before {
+            content: """;
+            font-size: 3rem;
+            color: #ddd;
+            position: absolute;
+            top: -10px;
+            left: 5px;
+        }
+        
+        .quote-block::before {
+            content: """;
+            font-size: 3rem;
+            color: #ddd;
+            position: absolute;
+            top: -10px;
+            left: 5px;
+        }
+        
+        /* Related Books */
+        .related-book {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .related-book:last-child {
+            border-bottom: none;
+        }
+        
+        .related-book h3 {
+            margin: 0 0 5px 0;
+            font-size: 1.1rem;
+        }
+        
+        .related-book .author {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .related-book .reason {
+            font-style: italic;
+            margin-top: 5px;
+            font-size: 0.9rem;
+        }
+        
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+            border: none;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-primary {
+            background-color: #4a6fa5;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background-color: #e9ecef;
+            color: #495057;
+        }
+        
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .btn-icon {
+            margin-right: 5px;
+        }
+        
+        /* Feedback Buttons */
+        .feedback-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .feedback-btn {
+            cursor: pointer;
+            background: none;
+            border: 1px solid #ddd;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all 0.3s;
+        }
+        
+        .feedback-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        .feedback-btn.thumbs-up:hover {
+            border-color: #4CAF50;
+            color: #4CAF50;
+        }
+        
+        .feedback-btn.thumbs-down:hover {
+            border-color: #F44336;
+            color: #F44336;
+        }
+        
+        .feedback-btn.active.thumbs-up {
+            background-color: #E8F5E9;
+            border-color: #4CAF50;
+            color: #4CAF50;
+        }
+        
+        .feedback-btn.active.thumbs-down {
+            background-color: #FFEBEE;
+            border-color: #F44336;
+            color: #F44336;
+        }
+        
+        .feedback-message {
+            font-size: 0.9rem;
+            color: #4CAF50;
+            margin-left: 10px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .feedback-message.active {
+            opacity: 1;
+        }
+        
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+        
+        .toast.active {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/recommendations" class="back-link">← Back to Recommendations</a>
+            <h1>{{ book.title }}</h1>
+            <div class="book-meta">
+                <span class="author">By {{ book.author }}</span> • 
+                <span class="type">{{ book.type }}</span>
+                {% if book.year and book.year != "Unknown" %}
+                • <span class="year">{{ book.year }}</span>
+                {% endif %}
+            </div>
+        </header>
+        
+        <div class="card-grid">
+            <!-- Left Column (2/3 width) -->
+            <div class="main-column">
+                <!-- Basic Info Card -->
+                <div class="card basic-info">
+                    <h2>About This Book</h2>
+                    
+                    <div class="match-info">
+                        <p class="match-score {% if book.match_score >= 80 %}score-high{% elif book.match_score >= 50 %}score-medium{% else %}score-low{% endif %}">
+                            Match Score: {{ book.match_score }}/100
+                        </p>
+                    </div>
+                    
+                    <p class="summary">{{ book.summary }}</p>
+                    
+                    <div class="action-buttons">
+                        <button id="save-button" class="btn {% if book.saved %}btn-success{% else %}btn-primary{% endif %}" data-title="{{ book.title }}">
+                            <span class="btn-icon">{% if book.saved %}✓{% else %}+{% endif %}</span>
+                            {% if book.saved %}Saved to Reading List{% else %}Save to Reading List{% endif %}
+                        </button>
+                        <button id="share-button" class="btn btn-secondary" data-title="{{ book.title }}">
+                            <span class="btn-icon">🔗</span>
+                            Share
+                        </button>
+                    </div>
+                    
+                    <div class="feedback-buttons">
+                        <button class="feedback-btn thumbs-up" data-title="{{ book.title }}" data-feedback="1" title="This recommendation is helpful">👍</button>
+                        <button class="feedback-btn thumbs-down" data-title="{{ book.title }}" data-feedback="-1" title="This recommendation is not helpful">👎</button>
+                        <span class="feedback-message">Thanks for your feedback!</span>
+                    </div>
+                </div>
+                
+                <!-- News Cards -->
+                <div class="card news">
+                    <h2>X Buzz</h2>
+                    {% if book.news_x %}
+                        {% for item in book.news_x %}
+                        <div class="list-item">
+                            <p>{{ item }}</p>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p>No recent mentions on X found.</p>
+                    {% endif %}
+                </div>
+                
+                <div class="card news">
+                    <h2>Web Mentions</h2>
+                    {% if book.news_web %}
+                        {% for item in book.news_web %}
+                        <div class="list-item">
+                            <p>{{ item }}</p>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p>No recent web mentions found.</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Right Column (1/3 width) -->
+            <div class="side-column">
+                <!-- Quotes Card -->
+                <div class="card quotes">
+                    <h2>Notable Quotes</h2>
+                    {% if book.quotes %}
+                        {% for quote in book.quotes %}
+                        <div class="quote">
+                            <p>{{ quote }}</p>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p>No notable quotes available.</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Related Books Card -->
+                <div class="card related">
+                    <h2>Related Books</h2>
+                    {% if book.related %}
+                        {% for related in book.related %}
+                        <div class="related-book">
+                            <h3><a href="/book?title={{ related.title|urlencode }}">{{ related.title }}</a></h3>
+                            <p class="author">By {{ related.author }}</p>
+                            <p class="type">{{ related.type }}</p>
+                            {% if related.reason %}
+                            <p class="reason">{{ related.reason }}</p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p>No related books found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>&copy; 2025 Luminaria - Powered by Perplexity API</p>
+        </footer>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Save to Reading List
+            const saveButton = document.getElementById('save-button');
+            if (saveButton) {
+                saveButton.addEventListener('click', function() {
+                    const title = this.getAttribute('data-title');
+                    
+                    fetch('/save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            title: title
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update button appearance
+                            this.classList.remove('btn-primary');
+                            this.classList.add('btn-success');
+                            this.innerHTML = '<span class="btn-icon">✓</span> Saved to Reading List';
+                            
+                            // Show toast
+                            showToast('Added to your reading list!');
+                        } else {
+                            showToast('Error saving to reading list');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error saving to reading list:', error);
+                        showToast('Error saving to reading list');
+                    });
+                });
+            }
+            
+            // Share Button
+            const shareButton = document.getElementById('share-button');
+            if (shareButton) {
+                shareButton.addEventListener('click', function() {
+                    const title = this.getAttribute('data-title');
+                    const url = window.location.href;
+                    
+                    // Copy to clipboard
+                    navigator.clipboard.writeText(url).then(() => {
+                        showToast('Link copied to clipboard!');
+                    }, () => {
+                        showToast('Failed to copy link');
+                    });
+                });
+            }
+            
+            // Feedback Buttons
+            document.querySelectorAll('.feedback-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const title = this.getAttribute('data-title');
+                    const feedback = parseInt(this.getAttribute('data-feedback'));
+                    const feedbackMessage = document.querySelector('.feedback-message');
+                    
+                    // Remove active class from both buttons
+                    document.querySelectorAll('.feedback-btn').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    
+                    // Add active class to the clicked button
+                    this.classList.add('active');
+                    
+                    // Show feedback message
+                    feedbackMessage.classList.add('active');
+                    setTimeout(() => { feedbackMessage.classList.remove('active'); }, 3000);
+                    
+                    // Send feedback to the server
+                    fetch('/feedback', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            title: title,
+                            feedback: feedback
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Feedback submitted:', data);
+                    })
+                    .catch(error => {
+                        console.error('Error submitting feedback:', error);
+                    });
+                });
+            });
+            
+            // Toast function
+            function showToast(message) {
+                const toast = document.getElementById('toast');
+                toast.textContent = message;
+                toast.classList.add('active');
+                
+                setTimeout(() => {
+                    toast.classList.remove('active');
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>

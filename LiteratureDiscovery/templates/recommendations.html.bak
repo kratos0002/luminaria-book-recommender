@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Personalized Recommendations - LiteratureDiscovery</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .recommendation-card.trending {
+            border-left: 4px solid #ff6b6b;
+            background-color: #fff5f5;
+        }
+        
+        .recommendations-container h2 {
+            margin-top: 30px;
+            margin-bottom: 15px;
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+        
+        .core-recommendations, .trending-recommendations {
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Your Personalized Recommendations</h1>
+            {% if user_input %}
+            <h2 class="user-input">Recommendations for: "{{ user_input }}"</h2>
+            {% endif %}
+            {% if context_description %}
+            <div class="context-description">
+                <p><i>{{ context_description }}</i></p>
+            </div>
+            {% endif %}
+            
+            <!-- User History Section -->
+            {% if history %}
+            <div class="user-history">
+                <h3>Based on your reading interests:</h3>
+                <ul class="history-list">
+                    {% for item in history %}
+                    <li>"{{ item }}"</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            
+            <!-- Terms Used Section -->
+            {% if terms %}
+            <div class="terms-used">
+                <h3>Themes we considered:</h3>
+                <div class="terms-tags">
+                    {% for term in terms %}
+                    <span class="term-tag">{{ term }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if cached %}
+            <div class="cache-notice cache-hit">Results served from cache</div>
+            {% else %}
+            <div class="cache-notice cache-miss">Freshly generated results</div>
+            {% endif %}
+        </header>
+        
+        <main>
+            <div class="recommendations-container">
+                <h2>Core Recommendations</h2>
+                <div class="recommendations core-recommendations">
+                {% if recommendations.core %}
+                    {% for item, score, matched_terms in recommendations.core %}
+                    <div class="recommendation-card">
+                        <h2 class="title">{{ item.title }}</h2>
+                        <div class="meta">
+                            <span class="author">{{ item.author }}</span>
+                            {% if item.item_type %}
+                            <span class="type">{{ item.item_type }}</span>
+                            {% endif %}
+                            {% if item.genre %}
+                            <span class="genre">{{ item.genre }}</span>
+                            {% endif %}
+                            {% if item.publication_date %}
+                            <span class="date">{{ item.publication_date }}</span>
+                            {% endif %}
+                        </div>
+                        <p class="description">{{ item.description }}</p>
+                        <div class="match-info">
+                            <p class="match-score">Relevance score: {{ "%.2f"|format(score) }}</p>
+                            {% if matched_terms %}
+                            <p class="match-terms">Why this? Matches: {{ matched_terms|join(", ") }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="no-results">
+                        <p>No core recommendations found. Please try different preferences.</p>
+                    </div>
+                {% endif %}
+                </div>
+                
+                <h2>Trending Now</h2>
+                <div class="recommendations trending-recommendations">
+                {% if recommendations.trending %}
+                    {% for item, score, matched_terms in recommendations.trending %}
+                    <div class="recommendation-card trending">
+                        <h2 class="title">{{ item.title }}</h2>
+                        <div class="meta">
+                            <span class="author">{{ item.author }}</span>
+                            {% if item.item_type %}
+                            <span class="type">{{ item.item_type }}</span>
+                            {% endif %}
+                            {% if item.genre %}
+                            <span class="genre">{{ item.genre }}</span>
+                            {% endif %}
+                            {% if item.publication_date %}
+                            <span class="date">{{ item.publication_date }}</span>
+                            {% endif %}
+                        </div>
+                        <p class="description">{{ item.description }}</p>
+                        <div class="match-info">
+                            <p class="match-score">Relevance score: {{ "%.2f"|format(score) }}</p>
+                            {% if matched_terms %}
+                            <p class="match-terms">Why this? Matches: {{ matched_terms|join(", ") }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="no-results">
+                        <p>No trending recommendations found. Please try different preferences.</p>
+                    </div>
+                {% endif %}
+                </div>
+            </div><div class="actions">
+                <a href="/" class="btn-secondary">Back to Search</a>
+            </div>
+        </main>
+        
+        <footer>
+            <p>&copy; 2025 LiteratureDiscovery - Powered by Perplexity API</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,9 @@
+flask==3.0.2
+requests==2.31.0
+python-dotenv==1.0.1
+# WARNING: DO NOT UPGRADE OPENAI BEYOND 0.28.0
+# The application is specifically designed to work with this version
+# Upgrading will break the OpenAI API calls
+openai==0.28.0
+python-dateutil==2.8.2
+cachetools==5.3.1

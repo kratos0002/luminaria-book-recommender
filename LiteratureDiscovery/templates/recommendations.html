@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Personalized Recommendations - Luminaria</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* General Layout */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Sticky Input Bar */
+        .sticky-input-bar {
+            position: sticky;
+            top: 0;
+            background-color: #fff;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            border-radius: 0 0 8px 8px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .sticky-input-bar form {
+            flex: 1;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .sticky-input-bar input[type="text"] {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        .sticky-input-bar button {
+            background-color: #4a6fa5;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        .sticky-input-bar button:hover {
+            background-color: #3a5a8c;
+        }
+        
+        /* Two-column Layout */
+        .recommendations-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .recommendations-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Card Styling */
+        .recommendation-card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border-left: 4px solid #4a6fa5;
+        }
+        
+        .recommendation-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+        }
+        
+        .recommendation-card.trending {
+            border-left: 4px solid #ff6b6b;
+        }
+        
+        .recommendation-card .title {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 1.4rem;
+        }
+        
+        .recommendation-card .meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        /* Match Score Styling */
+        .match-score {
+            font-weight: bold;
+            margin-bottom: 5px;
+            padding: 5px 10px;
+            border-radius: 20px;
+            display: inline-block;
+            font-size: 0.9rem;
+        }
+        
+        .score-high {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .score-medium {
+            background-color: #fff8e1;
+            color: #f57f17;
+        }
+        
+        .score-low {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        
+        /* Collapsible Summary */
+        .summary-container {
+            margin: 15px 0;
+        }
+        
+        .summary-toggle {
+            background: none;
+            border: none;
+            color: #4a6fa5;
+            cursor: pointer;
+            font-weight: bold;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+        
+        .summary-toggle:hover {
+            text-decoration: underline;
+        }
+        
+        .summary-toggle::after {
+            content: "▼";
+            margin-left: 5px;
+            font-size: 0.8rem;
+            transition: transform 0.3s;
+        }
+        
+        .summary-toggle.active::after {
+            transform: rotate(180deg);
+        }
+        
+        .summary {
+            font-style: italic;
+            margin: 10px 0;
+            color: #555;
+            line-height: 1.4;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .summary.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        /* Feedback Buttons */
+        .feedback-buttons {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .feedback-btn {
+            background: none;
+            border: 1px solid #ddd;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .feedback-btn:hover {
+            background-color: #f0f2f5;
+            transform: scale(1.1);
+        }
+        
+        .feedback-btn.active {
+            border-color: #4a6fa5;
+            background-color: #e8f0fe;
+        }
+        
+        .feedback-message {
+            font-size: 0.9rem;
+            color: #4a6fa5;
+            margin-left: 10px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .feedback-message.active {
+            opacity: 1;
+        }
+        
+        /* Animation for feedback */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        
+        /* Match Terms */
+        .match-terms {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 10px;
+            padding: 8px;
+            background-color: #f0f2f5;
+            border-radius: 4px;
+        }
+        
+        /* Section Headers */
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .section-header .icon {
+            font-size: 1.5rem;
+            margin-right: 10px;
+        }
+        
+        .section-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: #2c3e50;
+        }
+        
+        /* Show More Button */
+        .show-more-btn {
+            background-color: transparent;
+            border: 1px solid #4a6fa5;
+            color: #4a6fa5;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            display: block;
+            width: 100%;
+            margin-top: 10px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        
+        .show-more-btn:hover {
+            background-color: #4a6fa5;
+            color: white;
+        }
+        
+        /* Footer */
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            padding: 20px 0;
+            color: #666;
+            font-size: 0.9rem;
+            border-top: 1px solid #eee;
+        }
+        
+        /* No Results */
+        .no-results {
+            padding: 20px;
+            text-align: center;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            color: #666;
+        }
+        
+        /* Match Score Note */
+        .match-score-note {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 2px;
+        }
+        
+        /* Search Information */
+        .search-info {
+            margin-bottom: 20px;
+        }
+        
+        .search-info h2 {
+            margin-top: 0;
+        }
+        
+        .search-description {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+        
+        .search-terms {
+            margin-bottom: 10px;
+        }
+        
+        .term-badge {
+            background-color: #f0f2f5;
+            padding: 5px 10px;
+            border-radius: 20px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sticky Input Bar -->
+        <div class="sticky-input-bar">
+            <form action="/recommendations" method="post">
+                <input type="text" name="literature_input" placeholder="Enter a book title or literary work..." value="{{ recommendations.input if recommendations.input else '' }}">
+                <button type="submit">Get Recommendations</button>
+            </form>
+            
+            <a href="/" class="back-btn">New Search</a>
+        </div>
+        
+        <header>
+            <div class="context-description">
+                {% if recommendations.context_description %}
+                <div class="context-card">
+                    <h2>About Your Query</h2>
+                    <p>{{ recommendations.context_description }}</p>
+                    
+                    {% if recommendations.terms %}
+                    <div class="terms-list">
+                        <h3>Key Themes</h3>
+                        <div class="terms-pills">
+                            {% for term in recommendations.terms %}
+                            <span class="term-pill">{{ term }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if recommendations.history %}
+                    <div class="history-note">
+                        <p><em>Note: These recommendations also consider your previous interests in: {{ recommendations.history|join(", ") }}</em></p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </header>
+        
+        <main>
+            <!-- User Search Information -->
+            {% if recommendations.input %}
+            <div class="search-info">
+                <h2>You searched for: <span class="highlight">{{ recommendations.input }}</span></h2>
+                {% if recommendations.context_description %}
+                <p class="search-description">{{ recommendations.context_description }}</p>
+                {% endif %}
+                <div class="search-terms">
+                    <p><strong>Related themes:</strong> 
+                    {% for term in recommendations.terms %}
+                        <span class="term-badge">{{ term }}</span>
+                    {% endfor %}
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="recommendations-grid">
+                <!-- Core Recommendations Column (2/3 width) -->
+                <div class="core-column">
+                    <div class="section-header">
+                        <span class="icon">📖</span>
+                        <h2>Core Recommendations</h2>
+                    </div>
+                    
+                    <div class="recommendations core-recommendations">
+                    {% if recommendations.core %}
+                        {% for item, score, matched_terms in recommendations.core %}
+                        <div class="recommendation-card" data-title="{{ item.title }}">
+                            <h2 class="title"><a href="/book?title={{ item.title|urlencode }}">{{ item.title }}</a></h2>
+                            <div class="meta">
+                                <span class="author">By {{ item.author }}</span>
+                                {% if item.item_type %}
+                                <span class="type">{{ item.item_type }}</span>
+                                {% endif %}
+                                {% if item.genre %}
+                                <span class="genre">{{ item.genre }}</span>
+                                {% endif %}
+                                {% if item.publication_date %}
+                                <span class="date">{{ item.publication_date }}</span>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="match-info">
+                                <p class="match-score {% if item.match_score >= 80 %}score-high{% elif item.match_score >= 50 %}score-medium{% else %}score-low{% endif %}">
+                                    Match Score: {{ item.match_score }}/100
+                                </p>
+                                <p class="match-score-note">How well this fits your input</p>
+                            </div>
+                            
+                            {% if item.summary %}
+                            <div class="summary-container">
+                                <button class="summary-toggle">Show Summary</button>
+                                <div class="summary">{{ item.summary }}</div>
+                            </div>
+                            {% endif %}
+                            
+                            {% if matched_terms %}
+                            <p class="match-terms">Why this? Matches: {{ matched_terms|join(", ") }}</p>
+                            {% endif %}
+                            
+                            <div class="feedback-buttons">
+                                <button class="feedback-btn thumbs-up" data-title="{{ item.title }}" data-feedback="1" title="This recommendation is helpful">👍</button>
+                                <button class="feedback-btn thumbs-down" data-title="{{ item.title }}" data-feedback="-1" title="This recommendation is not helpful">👎</button>
+                                <span class="feedback-message">Thanks for your feedback!</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="no-results">
+                            <p>No core recommendations found. Please try different preferences.</p>
+                        </div>
+                    {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Trending Recommendations Column (1/3 width) -->
+                <div class="trending-column">
+                    <div class="section-header">
+                        <span class="icon">🔥</span>
+                        <h2>Trending Now</h2>
+                    </div>
+                    
+                    <div class="recommendations trending-recommendations">
+                    {% if recommendations.trending %}
+                        {% for item, score, matched_terms in recommendations.trending %}
+                        <div class="recommendation-card trending" data-title="{{ item.title }}">
+                            <h2 class="title"><a href="/book?title={{ item.title|urlencode }}">{{ item.title }}</a></h2>
+                            <div class="meta">
+                                <span class="author">By {{ item.author }}</span>
+                                {% if item.item_type %}
+                                <span class="type">{{ item.item_type }}</span>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="match-info">
+                                <p class="match-score {% if item.match_score >= 80 %}score-high{% elif item.match_score >= 50 %}score-medium{% else %}score-low{% endif %}">
+                                    Match Score: {{ item.match_score }}/100
+                                </p>
+                            </div>
+                            
+                            {% if item.summary %}
+                            <div class="summary-container">
+                                <button class="summary-toggle">Show Summary</button>
+                                <div class="summary">{{ item.summary }}</div>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="feedback-buttons">
+                                <button class="feedback-btn thumbs-up" data-title="{{ item.title }}" data-feedback="1" title="This recommendation is helpful">👍</button>
+                                <button class="feedback-btn thumbs-down" data-title="{{ item.title }}" data-feedback="-1" title="This recommendation is not helpful">👎</button>
+                                <span class="feedback-message">Thanks for your feedback!</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        
+                        {% if recommendations.trending|length > 3 %}
+                        <button class="show-more-btn" id="show-more-trending">Show More Trending</button>
+                        {% endif %}
+                    {% else %}
+                        <div class="no-results">
+                            <p>No trending recommendations found. Please try different preferences.</p>
+                        </div>
+                    {% endif %}
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <footer>
+            <p>&copy; 2025 Luminaria - Powered by Perplexity API</p>
+        </footer>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Toggle summary visibility
+            document.querySelectorAll('.summary-toggle').forEach(toggle => {
+                toggle.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    const summary = this.nextElementSibling;
+                    summary.classList.toggle('active');
+                    this.textContent = summary.classList.contains('active') ? 'Hide Summary' : 'Show Summary';
+                });
+            });
+            
+            // Show more trending items
+            const showMoreBtn = document.getElementById('show-more-trending');
+            if (showMoreBtn) {
+                const trendingCards = document.querySelectorAll('.trending-recommendations .recommendation-card');
+                
+                // Initially hide items beyond the first 3
+                for (let i = 3; i < trendingCards.length; i++) {
+                    trendingCards[i].style.display = 'none';
+                }
+                
+                showMoreBtn.addEventListener('click', function() {
+                    for (let i = 3; i < trendingCards.length; i++) {
+                        trendingCards[i].style.display = trendingCards[i].style.display === 'none' ? 'block' : 'none';
+                    }
+                    this.textContent = this.textContent === 'Show More Trending' ? 'Show Less' : 'Show More Trending';
+                });
+            }
+            
+            // Set up feedback buttons with animation
+            document.querySelectorAll('.feedback-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const title = this.getAttribute('data-title');
+                    const feedback = parseInt(this.getAttribute('data-feedback'));
+                    const card = this.closest('.recommendation-card');
+                    const feedbackMessage = card.querySelector('.feedback-message');
+                    
+                    // Remove active class from both buttons in this card
+                    card.querySelectorAll('.feedback-btn').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    
+                    // Add active class to the clicked button with animation
+                    this.classList.add('active');
+                    this.style.animation = 'pulse 0.5s';
+                    setTimeout(() => { this.style.animation = ''; }, 500);
+                    
+                    // Show feedback message
+                    feedbackMessage.classList.add('active');
+                    setTimeout(() => { feedbackMessage.classList.remove('active'); }, 3000);
+                    
+                    // Send feedback to the server
+                    fetch('/feedback', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            title: title,
+                            feedback: feedback
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Feedback submitted:', data);
+                    })
+                    .catch(error => {
+                        console.error('Error submitting feedback:', error);
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>
