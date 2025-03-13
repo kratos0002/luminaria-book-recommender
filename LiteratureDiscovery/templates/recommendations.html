@@ -4,38 +4,165 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Your Personalized Recommendations - Luminaria</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dark-theme.css') }}">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        /* General Layout */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f5f7fa;
-            margin: 0;
-            padding: 0;
+        /* Additional custom styles for recommendations page */
+        .recommendations-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-top: 2rem;
         }
         
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
+        @media (max-width: 768px) {
+            .recommendations-grid {
+                grid-template-columns: 1fr;
+            }
         }
         
-        /* Sticky Input Bar */
-        .sticky-input-bar {
-            position: sticky;
+        .recommendation-card {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: 0 4px 10px var(--shadow-color);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .recommendation-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px var(--shadow-color);
+        }
+        
+        .recommendation-card:before {
+            content: '';
+            position: absolute;
+            left: 0;
             top: 0;
-            background-color: #fff;
-            padding: 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            z-index: 100;
-            border-radius: 0 0 8px 8px;
-            margin-bottom: 20px;
+            height: 100%;
+            width: 4px;
+            background-color: var(--accent-color);
+        }
+        
+        .recommendation-card.trending:before {
+            background-color: var(--danger-color);
+        }
+        
+        .recommendation-card .title {
+            font-weight: 600;
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+        }
+        
+        .recommendation-card .meta {
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        
+        .recommendation-card .author {
+            color: var(--accent-color);
+        }
+        
+        .match-score {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .score-high {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: var(--success-color);
+        }
+        
+        .score-medium {
+            background-color: rgba(255, 152, 0, 0.2);
+            color: var(--warning-color);
+        }
+        
+        .score-low {
+            background-color: rgba(244, 67, 54, 0.2);
+            color: var(--danger-color);
+        }
+        
+        .filter-panel {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 1.5rem;
+            position: sticky;
+            top: 20px;
+        }
+        
+        .filter-panel h3 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: var(--accent-color);
+        }
+        
+        .term-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .term-tag {
+            background-color: var(--secondary-bg);
+            color: var(--text-color);
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            transition: background-color var(--transition-speed), transform var(--transition-speed);
+            cursor: pointer;
+        }
+        
+        .term-tag:hover {
+            background-color: var(--accent-color);
+            color: var(--primary-bg);
+            transform: scale(1.05);
+        }
+        
+        .summary-toggle {
+            background: none;
+            border: none;
+            color: var(--accent-color);
+            font-size: 0.9rem;
+            cursor: pointer;
+            padding: 0;
+            font-weight: 500;
+            display: flex;
             align-items: center;
+            gap: 5px;
+        }
+        
+        .summary-content {
+            margin-top: 10px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+        }
+        
+        .sticky-input-bar {
+            padding: 1.2rem;
+            background-color: var(--secondary-bg);
+            border-radius: 10px;
+            box-shadow: 0 4px 10px var(--shadow-color);
+            margin-bottom: 2rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
         }
         
         .sticky-input-bar form {
@@ -46,553 +173,314 @@
         
         .sticky-input-bar input[type="text"] {
             flex: 1;
-            padding: 10px 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
+            padding: 0.8rem 1.2rem;
+            border: 2px solid var(--border-color);
+            border-radius: 25px;
+            font-size: 1rem;
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+        }
+        
+        .sticky-input-bar input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent-color);
         }
         
         .sticky-input-bar button {
-            background-color: #4a6fa5;
-            color: white;
+            background-color: var(--accent-color);
+            color: var(--primary-bg);
+            padding: 0.8rem 1.5rem;
             border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
+            border-radius: 25px;
+            font-weight: 600;
             cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.3s;
+            transition: background-color var(--transition-speed);
         }
         
         .sticky-input-bar button:hover {
-            background-color: #3a5a8c;
+            background-color: var(--accent-hover);
         }
         
-        /* Two-column Layout */
-        .recommendations-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
+        .book-cover-img {
+            width: 100px;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 5px;
+            margin-right: 1.5rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
         
-        @media (max-width: 768px) {
-            .recommendations-grid {
-                grid-template-columns: 1fr;
+        .recommendation-content {
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        .recommendation-details {
+            flex: 1;
+        }
+        
+        @media (max-width: 600px) {
+            .recommendation-content {
+                flex-direction: column;
+            }
+            
+            .book-cover-img {
+                margin-bottom: 1rem;
+                margin-right: 0;
             }
         }
         
-        /* Card Styling */
-        .recommendation-card {
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            padding: 20px;
-            margin-bottom: 20px;
-            transition: transform 0.2s, box-shadow 0.2s;
-            border-left: 4px solid #4a6fa5;
-        }
-        
-        .recommendation-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
-        }
-        
-        .recommendation-card.trending {
-            border-left: 4px solid #ff6b6b;
-        }
-        
-        .recommendation-card .title {
-            margin-top: 0;
-            color: #2c3e50;
-            font-size: 1.4rem;
-        }
-        
-        .recommendation-card .meta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 15px;
-            font-size: 0.9rem;
-            color: #666;
-        }
-        
-        /* Match Score Styling */
-        .match-score {
-            font-weight: bold;
-            margin-bottom: 5px;
-            padding: 5px 10px;
-            border-radius: 20px;
-            display: inline-block;
-            font-size: 0.9rem;
-        }
-        
-        .score-high {
-            background-color: #e8f5e9;
-            color: #2e7d32;
-        }
-        
-        .score-medium {
-            background-color: #fff8e1;
-            color: #f57f17;
-        }
-        
-        .score-low {
-            background-color: #ffebee;
-            color: #c62828;
-        }
-        
-        /* Collapsible Summary */
-        .summary-container {
-            margin: 15px 0;
-        }
-        
-        .summary-toggle {
-            background: none;
-            border: none;
-            color: #4a6fa5;
-            cursor: pointer;
-            font-weight: bold;
-            padding: 0;
-            display: flex;
+        .btn-link {
+            color: var(--accent-color);
+            text-decoration: none;
+            display: inline-flex;
             align-items: center;
-            font-size: 0.9rem;
+            gap: 5px;
+            margin-top: 1rem;
+            font-weight: 500;
+            transition: color var(--transition-speed);
         }
         
-        .summary-toggle:hover {
+        .btn-link:hover {
+            color: var(--accent-hover);
             text-decoration: underline;
         }
         
-        .summary-toggle::after {
-            content: "▼";
-            margin-left: 5px;
-            font-size: 0.8rem;
-            transition: transform 0.3s;
+        .history-list {
+            list-style: none;
+            padding: 0;
         }
         
-        .summary-toggle.active::after {
-            transform: rotate(180deg);
+        .history-list li {
+            margin-bottom: 0.5rem;
         }
         
-        .summary {
-            font-style: italic;
-            margin: 10px 0;
-            color: #555;
-            line-height: 1.4;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 4px;
-            display: none;
-        }
-        
-        .summary.active {
-            display: block;
-            animation: fadeIn 0.3s;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        /* Feedback Buttons */
-        .feedback-buttons {
-            margin-top: 15px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        
-        .feedback-btn {
+        .history-item {
             background: none;
-            border: 1px solid #ddd;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            border: none;
+            color: var(--accent-color);
+            text-align: left;
+            padding: 0;
             cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .feedback-btn:hover {
-            background-color: #f0f2f5;
-            transform: scale(1.1);
-        }
-        
-        .feedback-btn.active {
-            border-color: #4a6fa5;
-            background-color: #e8f0fe;
-        }
-        
-        .feedback-message {
             font-size: 0.9rem;
-            color: #4a6fa5;
-            margin-left: 10px;
-            opacity: 0;
-            transition: opacity 0.3s;
+            transition: color var(--transition-speed);
         }
         
-        .feedback-message.active {
-            opacity: 1;
-        }
-        
-        /* Animation for feedback */
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); }
-        }
-        
-        /* Match Terms */
-        .match-terms {
-            font-size: 0.85rem;
-            color: #666;
-            margin-top: 10px;
-            padding: 8px;
-            background-color: #f0f2f5;
-            border-radius: 4px;
-        }
-        
-        /* Section Headers */
-        .section-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .section-header .icon {
-            font-size: 1.5rem;
-            margin-right: 10px;
-        }
-        
-        .section-header h2 {
-            margin: 0;
-            font-size: 1.5rem;
-            color: #2c3e50;
-        }
-        
-        /* Show More Button */
-        .show-more-btn {
-            background-color: transparent;
-            border: 1px solid #4a6fa5;
-            color: #4a6fa5;
-            padding: 8px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            display: block;
-            width: 100%;
-            margin-top: 10px;
-            transition: background-color 0.3s, color 0.3s;
-        }
-        
-        .show-more-btn:hover {
-            background-color: #4a6fa5;
-            color: white;
-        }
-        
-        /* Footer */
-        footer {
-            margin-top: 40px;
-            text-align: center;
-            padding: 20px 0;
-            color: #666;
-            font-size: 0.9rem;
-            border-top: 1px solid #eee;
-        }
-        
-        /* No Results */
-        .no-results {
-            padding: 20px;
-            text-align: center;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            color: #666;
-        }
-        
-        /* Match Score Note */
-        .match-score-note {
-            font-size: 0.8rem;
-            color: #888;
-            margin-top: 2px;
-        }
-        
-        /* Search Information */
-        .search-info {
-            margin-bottom: 20px;
-        }
-        
-        .search-info h2 {
-            margin-top: 0;
-        }
-        
-        .search-description {
-            font-size: 1.1rem;
-            margin-bottom: 10px;
-        }
-        
-        .search-terms {
-            margin-bottom: 10px;
-        }
-        
-        .term-badge {
-            background-color: #f0f2f5;
-            padding: 5px 10px;
-            border-radius: 20px;
-            margin-right: 10px;
+        .history-item:hover {
+            color: var(--accent-hover);
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Sticky Input Bar -->
-        <div class="sticky-input-bar">
-            <form action="/recommendations" method="post">
-                <input type="text" name="literature_input" placeholder="Enter a book title or literary work..." value="{{ recommendations.input if recommendations.input else '' }}">
-                <button type="submit">Get Recommendations</button>
-            </form>
-            
-            <a href="/" class="back-btn">New Search</a>
-        </div>
-        
         <header>
-            <div class="context-description">
-                {% if recommendations.context_description %}
-                <div class="context-card">
-                    <h2>About Your Query</h2>
-                    <p>{{ recommendations.context_description }}</p>
-                    
-                    {% if recommendations.terms %}
-                    <div class="terms-list">
-                        <h3>Key Themes</h3>
-                        <div class="terms-pills">
-                            {% for term in recommendations.terms %}
-                            <span class="term-pill">{{ term }}</span>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if recommendations.history %}
-                    <div class="history-note">
-                        <p><em>Note: These recommendations also consider your previous interests in: {{ recommendations.history|join(", ") }}</em></p>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endif %}
-            </div>
+            <a href="/" class="logo">
+                <i class="fas fa-book-open"></i>
+                <span>Luminaria</span>
+            </a>
+            <nav>
+                <ul>
+                    <li><a href="/book/my_books"><i class="fas fa-bookmark"></i> My Books</a></li>
+                </ul>
+            </nav>
         </header>
         
-        <main>
-            <!-- User Search Information -->
-            {% if recommendations.input %}
-            <div class="search-info">
-                <h2>You searched for: <span class="highlight">{{ recommendations.input }}</span></h2>
-                {% if recommendations.context_description %}
-                <p class="search-description">{{ recommendations.context_description }}</p>
-                {% endif %}
-                <div class="search-terms">
-                    <p><strong>Related themes:</strong> 
-                    {% for term in recommendations.terms %}
-                        <span class="term-badge">{{ term }}</span>
-                    {% endfor %}
-                    </p>
-                </div>
-            </div>
-            {% endif %}
-            
-            <div class="recommendations-grid">
-                <!-- Core Recommendations Column (2/3 width) -->
-                <div class="core-column">
-                    <div class="section-header">
-                        <span class="icon">📖</span>
-                        <h2>Core Recommendations</h2>
-                    </div>
-                    
-                    <div class="recommendations core-recommendations">
-                    {% if recommendations.core %}
-                        {% for item, score, matched_terms in recommendations.core %}
-                        <div class="recommendation-card" data-title="{{ item.title }}">
-                            <h2 class="title"><a href="/book?title={{ item.title|urlencode }}">{{ item.title }}</a></h2>
-                            <div class="meta">
-                                <span class="author">By {{ item.author }}</span>
-                                {% if item.item_type %}
-                                <span class="type">{{ item.item_type }}</span>
-                                {% endif %}
-                                {% if item.genre %}
-                                <span class="genre">{{ item.genre }}</span>
-                                {% endif %}
-                                {% if item.publication_date %}
-                                <span class="date">{{ item.publication_date }}</span>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="match-info">
-                                <p class="match-score {% if item.match_score >= 80 %}score-high{% elif item.match_score >= 50 %}score-medium{% else %}score-low{% endif %}">
-                                    Match Score: {{ item.match_score }}/100
-                                </p>
-                                <p class="match-score-note">How well this fits your input</p>
-                            </div>
-                            
-                            {% if item.summary %}
-                            <div class="summary-container">
-                                <button class="summary-toggle">Show Summary</button>
-                                <div class="summary">{{ item.summary }}</div>
-                            </div>
-                            {% endif %}
-                            
-                            {% if matched_terms %}
-                            <p class="match-terms">Why this? Matches: {{ matched_terms|join(", ") }}</p>
-                            {% endif %}
-                            
-                            <div class="feedback-buttons">
-                                <button class="feedback-btn thumbs-up" data-title="{{ item.title }}" data-feedback="1" title="This recommendation is helpful">👍</button>
-                                <button class="feedback-btn thumbs-down" data-title="{{ item.title }}" data-feedback="-1" title="This recommendation is not helpful">👎</button>
-                                <span class="feedback-message">Thanks for your feedback!</span>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="no-results">
-                            <p>No core recommendations found. Please try different preferences.</p>
-                        </div>
-                    {% endif %}
-                    </div>
-                </div>
+        <div class="sticky-input-bar">
+            <form action="/recommendations" method="POST">
+                <input type="text" name="literature_input" value="{{ recommendations.input }}" placeholder="Search for books...">
+                <button type="submit">
+                    <i class="fas fa-search"></i> Discover
+                </button>
+            </form>
+        </div>
+        
+        <div class="recommendations-grid">
+            <div class="recommendations-main">
+                <h2>Your Personalized Recommendations</h2>
+                <p>Based on your interest in "{{ recommendations.input }}"</p>
                 
-                <!-- Trending Recommendations Column (1/3 width) -->
-                <div class="trending-column">
-                    <div class="section-header">
-                        <span class="icon">🔥</span>
-                        <h2>Trending Now</h2>
-                    </div>
-                    
-                    <div class="recommendations trending-recommendations">
-                    {% if recommendations.trending %}
-                        {% for item, score, matched_terms in recommendations.trending %}
-                        <div class="recommendation-card trending" data-title="{{ item.title }}">
-                            <h2 class="title"><a href="/book?title={{ item.title|urlencode }}">{{ item.title }}</a></h2>
-                            <div class="meta">
-                                <span class="author">By {{ item.author }}</span>
-                                {% if item.item_type %}
-                                <span class="type">{{ item.item_type }}</span>
+                {% if recommendations.core %}
+                    <h3>Recommended Books For You</h3>
+                    {% for item, score, terms in recommendations.core %}
+                        <div class="recommendation-card">
+                            <div class="recommendation-content">
+                                {% if item.image_url %}
+                                    <img src="{{ item.image_url }}" alt="{{ item.title }}" class="book-cover-img">
+                                {% else %}
+                                    <img src="{{ url_for('static', filename='images/placeholder-cover.jpg') }}" alt="{{ item.title }}" class="book-cover-img">
                                 {% endif %}
-                            </div>
-                            
-                            <div class="match-info">
-                                <p class="match-score {% if item.match_score >= 80 %}score-high{% elif item.match_score >= 50 %}score-medium{% else %}score-low{% endif %}">
-                                    Match Score: {{ item.match_score }}/100
-                                </p>
-                            </div>
-                            
-                            {% if item.summary %}
-                            <div class="summary-container">
-                                <button class="summary-toggle">Show Summary</button>
-                                <div class="summary">{{ item.summary }}</div>
-                            </div>
-                            {% endif %}
-                            
-                            <div class="feedback-buttons">
-                                <button class="feedback-btn thumbs-up" data-title="{{ item.title }}" data-feedback="1" title="This recommendation is helpful">👍</button>
-                                <button class="feedback-btn thumbs-down" data-title="{{ item.title }}" data-feedback="-1" title="This recommendation is not helpful">👎</button>
-                                <span class="feedback-message">Thanks for your feedback!</span>
+                                
+                                <div class="recommendation-details">
+                                    <h3 class="title">{{ item.title }}</h3>
+                                    <div class="meta">
+                                        <span class="author">{{ item.author }}</span>
+                                        {% if item.publication_date %}
+                                            <span>{{ item.publication_date }}</span>
+                                        {% endif %}
+                                        {% if item.genre %}
+                                            <span>{{ item.genre }}</span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="match-score {% if score > 0.75 %}score-high{% elif score > 0.5 %}score-medium{% else %}score-low{% endif %}">
+                                        Match: {{ (score * 100)|int }}%
+                                    </div>
+                                    
+                                    <div class="summary-container">
+                                        <button class="summary-toggle" onclick="toggleSummary(this)">
+                                            <i class="fas fa-chevron-down"></i> Show Summary
+                                        </button>
+                                        <div class="summary-content" style="display: none;">
+                                            {% if item.summary %}
+                                                {{ item.summary }}
+                                            {% elif item.description %}
+                                                {{ item.description }}
+                                            {% else %}
+                                                No summary available.
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    {% if terms %}
+                                        <div class="term-cloud">
+                                            {% for term in terms[:5] %}
+                                                <span class="term-tag">{{ term }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    
+                                    {% if item.goodreads_id %}
+                                        <a href="https://www.goodreads.com/book/show/{{ item.goodreads_id }}" target="_blank" class="btn-link">
+                                            <i class="fas fa-external-link-alt"></i> View on Goodreads
+                                        </a>
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
-                        {% endfor %}
-                        
-                        {% if recommendations.trending|length > 3 %}
-                        <button class="show-more-btn" id="show-more-trending">Show More Trending</button>
-                        {% endif %}
-                    {% else %}
-                        <div class="no-results">
-                            <p>No trending recommendations found. Please try different preferences.</p>
+                    {% endfor %}
+                {% endif %}
+                
+                {% if recommendations.trending %}
+                    <h3>Trending Now</h3>
+                    {% for item, score, terms in recommendations.trending %}
+                        <div class="recommendation-card trending">
+                            <div class="recommendation-content">
+                                {% if item.image_url %}
+                                    <img src="{{ item.image_url }}" alt="{{ item.title }}" class="book-cover-img">
+                                {% else %}
+                                    <img src="{{ url_for('static', filename='images/placeholder-cover.jpg') }}" alt="{{ item.title }}" class="book-cover-img">
+                                {% endif %}
+                                
+                                <div class="recommendation-details">
+                                    <h3 class="title">{{ item.title }}</h3>
+                                    <div class="meta">
+                                        <span class="author">{{ item.author }}</span>
+                                        {% if item.publication_date %}
+                                            <span>{{ item.publication_date }}</span>
+                                        {% endif %}
+                                        {% if item.genre %}
+                                            <span>{{ item.genre }}</span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="match-score {% if score > 0.75 %}score-high{% elif score > 0.5 %}score-medium{% else %}score-low{% endif %}">
+                                        Match: {{ (score * 100)|int }}%
+                                    </div>
+                                    
+                                    <div class="summary-container">
+                                        <button class="summary-toggle" onclick="toggleSummary(this)">
+                                            <i class="fas fa-chevron-down"></i> Show Summary
+                                        </button>
+                                        <div class="summary-content" style="display: none;">
+                                            {% if item.summary %}
+                                                {{ item.summary }}
+                                            {% elif item.description %}
+                                                {{ item.description }}
+                                            {% else %}
+                                                No summary available.
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    {% if terms %}
+                                        <div class="term-cloud">
+                                            {% for term in terms[:5] %}
+                                                <span class="term-tag">{{ term }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    
+                                    {% if item.goodreads_id %}
+                                        <a href="https://www.goodreads.com/book/show/{{ item.goodreads_id }}" target="_blank" class="btn-link">
+                                            <i class="fas fa-external-link-alt"></i> View on Goodreads
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
+                {% if not recommendations.core and not recommendations.trending %}
+                    <div class="card">
+                        <p>No recommendations found for your input. Try a different book, author, or theme.</p>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <div class="filter-panel-container">
+                <div class="filter-panel">
+                    <h3>About Your Search</h3>
+                    {% if recommendations.context_description %}
+                        <p>{{ recommendations.context_description }}</p>
+                    {% endif %}
+                    
+                    <h3>Literary Terms</h3>
+                    {% if recommendations.terms %}
+                        <div class="term-cloud">
+                            {% for term in recommendations.terms %}
+                                <span class="term-tag">{{ term }}</span>
+                            {% endfor %}
                         </div>
                     {% endif %}
-                    </div>
+                    
+                    <h3>Your Recent Searches</h3>
+                    {% if recommendations.history %}
+                        <ul class="history-list">
+                            {% for item in recommendations.history %}
+                                <li>
+                                    <form action="/recommendations" method="POST">
+                                        <input type="hidden" name="literature_input" value="{{ item }}">
+                                        <button type="submit" class="history-item">{{ item }}</button>
+                                    </form>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>No recent searches.</p>
+                    {% endif %}
                 </div>
             </div>
-        </main>
+        </div>
         
         <footer>
-            <p>&copy; 2025 Luminaria - Powered by Perplexity API</p>
+            <p>Powered by Luminaria &copy; 2025</p>
         </footer>
     </div>
     
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Toggle summary visibility
-            document.querySelectorAll('.summary-toggle').forEach(toggle => {
-                toggle.addEventListener('click', function() {
-                    this.classList.toggle('active');
-                    const summary = this.nextElementSibling;
-                    summary.classList.toggle('active');
-                    this.textContent = summary.classList.contains('active') ? 'Hide Summary' : 'Show Summary';
-                });
-            });
+        function toggleSummary(button) {
+            const summaryContent = button.nextElementSibling;
             
-            // Show more trending items
-            const showMoreBtn = document.getElementById('show-more-trending');
-            if (showMoreBtn) {
-                const trendingCards = document.querySelectorAll('.trending-recommendations .recommendation-card');
-                
-                // Initially hide items beyond the first 3
-                for (let i = 3; i < trendingCards.length; i++) {
-                    trendingCards[i].style.display = 'none';
-                }
-                
-                showMoreBtn.addEventListener('click', function() {
-                    for (let i = 3; i < trendingCards.length; i++) {
-                        trendingCards[i].style.display = trendingCards[i].style.display === 'none' ? 'block' : 'none';
-                    }
-                    this.textContent = this.textContent === 'Show More Trending' ? 'Show Less' : 'Show More Trending';
-                });
+            if (summaryContent.style.display === 'none') {
+                summaryContent.style.display = 'block';
+                button.innerHTML = '<i class="fas fa-chevron-up"></i> Hide Summary';
+            } else {
+                summaryContent.style.display = 'none';
+                button.innerHTML = '<i class="fas fa-chevron-down"></i> Show Summary';
             }
-            
-            // Set up feedback buttons with animation
-            document.querySelectorAll('.feedback-btn').forEach(button => {
-                button.addEventListener('click', function() {
-                    const title = this.getAttribute('data-title');
-                    const feedback = parseInt(this.getAttribute('data-feedback'));
-                    const card = this.closest('.recommendation-card');
-                    const feedbackMessage = card.querySelector('.feedback-message');
-                    
-                    // Remove active class from both buttons in this card
-                    card.querySelectorAll('.feedback-btn').forEach(btn => {
-                        btn.classList.remove('active');
-                    });
-                    
-                    // Add active class to the clicked button with animation
-                    this.classList.add('active');
-                    this.style.animation = 'pulse 0.5s';
-                    setTimeout(() => { this.style.animation = ''; }, 500);
-                    
-                    // Show feedback message
-                    feedbackMessage.classList.add('active');
-                    setTimeout(() => { feedbackMessage.classList.remove('active'); }, 3000);
-                    
-                    // Send feedback to the server
-                    fetch('/feedback', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            title: title,
-                            feedback: feedback
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('Feedback submitted:', data);
-                    })
-                    .catch(error => {
-                        console.error('Error submitting feedback:', error);
-                    });
-                });
-            });
-        });
+        }
     </script>
 </body>
 </html>

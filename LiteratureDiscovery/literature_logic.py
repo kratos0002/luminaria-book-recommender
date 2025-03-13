@@ -19,6 +19,8 @@ from typing import Dict, List, Tuple, Optional, Set
 from datetime import datetime
 from cachetools import TTLCache
 from dotenv import load_dotenv
+from bs4 import BeautifulSoup
+from urllib.parse import quote_plus
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +28,16 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
+
+# Initialize caches
+author_cache = TTLCache(maxsize=100, ttl=3600)  # Cache author lookups for 1 hour
+
+# Database path
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_history.db")
+
+def get_db_connection():
+    """Get a connection to the SQLite database."""
+    return sqlite3.connect(DB_PATH)
 
 # Configure OpenAI
 import openai
@@ -43,9 +55,6 @@ if not PERPLEXITY_API_KEY:
 # Create caches with TTL (Time To Live)
 prefs_cache = TTLCache(maxsize=50, ttl=24*3600)  # 24 hours
 trends_cache = TTLCache(maxsize=100, ttl=3600)   # 1 hour
-
-# Cache for author lookups (24 hour TTL)
-author_cache = TTLCache(maxsize=50, ttl=24*3600)
 
 # Define stopwords for filtering
 STOPWORDS = {
@@ -110,7 +119,7 @@ class LiteratureItem:
     
     def __init__(self, title: str, author: str, publication_date: str = "", 
                  genre: str = "", description: str = "", item_type: str = "book", 
-                 summary: str = "", is_trending: bool = False):
+                 summary: str = "", is_trending: bool = False, image_url: str = "", goodreads_id: str = ""):
         self.title = title
         self.author = author
         self.publication_date = publication_date
@@ -122,8 +131,8 @@ class LiteratureItem:
         self.summary = summary  # 2-3 sentence summary of the work
         self.match_score = 0  # Match score (0-100) indicating how well it matches user input
         self.is_trending = is_trending  # Flag indicating if this is a trending item
-    
-    
+        self.image_url = image_url  # URL to the book cover image
+        self.goodreads_id = goodreads_id  # Goodreads ID for the book
     
     def to_dict(self):
         """Convert to dictionary for JSON serialization."""
@@ -138,7 +147,9 @@ class LiteratureItem:
             "matched_terms": list(self.matched_terms),
             "summary": self.summary,
             "match_score": self.match_score,
-            "is_trending": self.is_trending
+            "is_trending": self.is_trending,
+            "image_url": self.image_url,
+            "goodreads_id": self.goodreads_id
         }
 
 # SQLite Database Functions
@@ -150,14 +161,30 @@ def init_db():
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.cursor()
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS user_inputs (
+        
+        # Create user_history table if it doesn't exist
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT NOT NULL,
-            input TEXT NOT NULL UNIQUE,
-            timestamp DATETIME NOT NULL
+            input_text TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
-        """)
+        ''')
+        
+        # Create book_covers table if it doesn't exist
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS book_covers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            author TEXT,
+            image_url TEXT,
+            goodreads_id TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(title, author)
+        )
+        ''')
+        
         conn.commit()
         logger.info("Database initialized successfully")
     except Exception as e:
@@ -185,7 +212,7 @@ def store_user_input(session_id: str, literature_input: str):
         
         # Store the input with current timestamp
         cursor.execute(
-            "INSERT INTO user_inputs (session_id, input, timestamp) VALUES (?, ?, ?)",
+            "INSERT INTO user_history (session_id, input_text, timestamp) VALUES (?, ?, ?)",
             (session_id, literature_input, datetime.now())
         )
         conn.commit()
@@ -297,7 +324,7 @@ def get_user_feedback(session_id: str) -> Dict[str, int]:
         
         # Get the most recent inputs excluding the current one
         cursor.execute(
-            "SELECT input FROM user_inputs WHERE session_id = ? ORDER BY timestamp DESC LIMIT ?",
+            "SELECT input_text FROM user_history WHERE session_id = ? ORDER BY timestamp DESC LIMIT ?",
             (session_id, limit)
         )
         
@@ -785,82 +812,121 @@ def get_literary_trends(user_terms: List[str] = None, literature_input: str = No
 
 def parse_literature_items(text: str, is_trending: bool = False) -> List[LiteratureItem]:
     """
-    Parse the response from Perplexity API into LiteratureItem objects.
+    Parse literature items from text response.
     
     Args:
-        text: The text response from Perplexity
+        text: Text response from the API
         is_trending: Flag indicating if these are trending items
         
     Returns:
         List of LiteratureItem objects
     """
-    logger.info("Parsing literature items from text")
-    
-    # Clean up markdown formatting that might interfere with parsing
-    text = text.replace('**', '')
+    if not text:
+        return []
     
     items = []
     
-    # Look for items with clear Title: Author: Type: Description: format
-    title_pattern = re.compile(r'Title:\s*(.+?)(?:\n|$)', re.IGNORECASE)
-    author_pattern = re.compile(r'Author:\s*(.+?)(?:\n|$)', re.IGNORECASE)
-    type_pattern = re.compile(r'Type:\s*(.+?)(?:\n|$)', re.IGNORECASE)
-    desc_pattern = re.compile(r'Description:\s*(.+?)(?:\n\n|$)', re.IGNORECASE | re.DOTALL)
-    
-    # Split text by numbered items or double newlines
-    sections = re.split(r'\n\s*\d+\.|\n\n+', text)
-    
-    for section in sections:
-        if not section.strip():
-            continue
-            
-        # Extract fields using regex patterns
-        title_match = title_pattern.search(section)
-        author_match = author_pattern.search(section)
-        type_match = type_pattern.search(section)
-        desc_match = desc_pattern.search(section)
+    # Try to extract structured data
+    sections = re.split(r'\n\s*\d+\.\s+', text)
+    if len(sections) > 1:
+        # Remove the introduction text
+        sections = sections[1:]
         
-        # If we found a title, create a new item
-        if title_match:
-            title = title_match.group(1).strip()
+        for section in sections:
+            # Extract title
+            title_match = re.search(r'(?:Title|Book):\s*([^\n]+)', section, re.IGNORECASE)
+            title = title_match.group(1).strip() if title_match else "Unknown Title"
             
-            # Create a new literature item
+            # Extract author
+            author_match = re.search(r'Author:\s*([^\n]+)', section, re.IGNORECASE)
+            author = author_match.group(1).strip() if author_match else "Unknown Author"
+            
+            # Extract description
+            desc_match = re.search(r'(?:Description|Summary):\s*([^\n]+(?:\n[^\n]+)*)', section, re.IGNORECASE)
+            description = desc_match.group(1).strip() if desc_match else section.strip()
+            
+            # Extract type
+            type_match = re.search(r'Type:\s*([^\n]+)', section, re.IGNORECASE)
+            item_type = type_match.group(1).strip().lower() if type_match else "book"
+            
+            # Look for Goodreads ID in the description
+            goodreads_id = None
+            goodreads_match = re.search(r'Goodreads ID:\s*(\d+)', section, re.IGNORECASE)
+            if goodreads_match:
+                goodreads_id = goodreads_match.group(1)
+            
+            # Get book cover image URL
+            image_url, goodreads_id = get_book_cover(title, author, goodreads_id)
+            
+            literature_item = LiteratureItem(
+                title=title,
+                author=author,
+                description=description,
+                item_type=item_type,
+                is_trending=is_trending,
+                image_url=image_url,
+                goodreads_id=goodreads_id
+            )
+            
+            items.append(literature_item)
+    else:
+        # Try to extract items from unstructured text
+        # Split by newlines and look for patterns
+        lines = text.split('\n')
+        current_item_text = ""
+        
+        for line in lines:
+            line = line.strip()
+            
+            # Check if this line starts a new item
+            if re.match(r'^\d+\.\s+', line):
+                # Process the previous item if it exists
+                if current_item_text:
+                    # Extract title from the first line
+                    title_match = re.search(r'^\d+\.\s+([^:]+)', current_item_text)
+                    title = title_match.group(1).strip() if title_match else "Unknown Title"
+                    
+                    # Get book cover image URL
+                    image_url, goodreads_id = get_book_cover(title)
+                    
+                    # Create a new literature item
+                    item = LiteratureItem(
+                        title=title,
+                        author="Unknown Author",
+                        description=current_item_text.strip(),
+                        item_type="book",
+                        is_trending=is_trending,
+                        image_url=image_url,
+                        goodreads_id=goodreads_id
+                    )
+                    
+                    items.append(item)
+                
+                # Start a new item
+                current_item_text = line
+            else:
+                # Continue the current item
+                current_item_text += "\n" + line
+        
+        # Process the last item
+        if current_item_text:
+            title_match = re.search(r'^\d+\.\s+([^:]+)', current_item_text)
+            title = title_match.group(1).strip() if title_match else "Unknown Title"
+            
+            # Get book cover image URL
+            image_url, goodreads_id = get_book_cover(title)
+            
             item = LiteratureItem(
                 title=title,
-                author=author_match.group(1).strip() if author_match else "Unknown Author",
-                description=desc_match.group(1).strip() if desc_match else section.strip(),
-                item_type=type_match.group(1).strip().lower() if type_match else "book"
+                author="Unknown Author",
+                description=current_item_text.strip(),
+                item_type="book",
+                is_trending=is_trending,
+                image_url=image_url,
+                goodreads_id=goodreads_id
             )
             
             items.append(item)
-            logger.info(f"Parsed item: {item.title}")
-    
-    # If we couldn't parse any items with the structured approach, try a fallback approach
-    if not items:
-        logger.warning("Structured parsing failed, trying fallback approach")
-        
-        # Try to find numbered items (1., 2., etc.)
-        numbered_items = re.split(r'\n\s*\d+\.', text)
-        
-        for item_text in numbered_items:
-            if not item_text.strip():
-                continue
-                
-            # Try to extract a title from the first line
-            lines = item_text.strip().split('\n')
-            title = lines[0].strip()
-            
-            if title:
-                # Create a new literature item
-                item = LiteratureItem(
-                    title=title,
-                    author="Unknown Author",
-                    description=item_text.strip(),
-                    item_type="book"
-                )
-                
-                items.append(item)
-                logger.info(f"Parsed item using fallback: {item.title}")
     
     return items
 
@@ -1077,6 +1143,273 @@ def get_recommendations(literature_input: str, session_id: str = None) -> Dict:
         "history": history_used,
         "input": literature_input  # Include the original input
     }
+
+def get_book_cover(title: str, author: str = "", goodreads_id: str = None) -> Tuple[str, str]:
+    """
+    Get the book cover image URL for a given book title.
+    
+    Args:
+        title: The title of the book
+        author: Optional author name
+        goodreads_id: Optional Goodreads ID
+        
+    Returns:
+        Tuple of (image_url, goodreads_id)
+    """
+    # Clean up the title
+    title = title.strip()
+    if not title:
+        return "", ""
+    
+    # Check if we already have this book cover in the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # If we have a Goodreads ID, use it to look up the book
+    if goodreads_id:
+        cursor.execute("SELECT image_url FROM book_covers WHERE goodreads_id = ?", (goodreads_id,))
+        result = cursor.fetchone()
+        if result and result[0]:
+            logger.info(f"Found image URL in database for Goodreads ID: {goodreads_id}")
+            conn.close()
+            return result[0], goodreads_id
+    
+    # Try to find by title and author
+    if author:
+        cursor.execute("SELECT image_url, goodreads_id FROM book_covers WHERE title = ? AND author = ?", (title, author))
+    else:
+        cursor.execute("SELECT image_url, goodreads_id FROM book_covers WHERE title = ?", (title,))
+    
+    result = cursor.fetchone()
+    if result and result[0]:
+        logger.info(f"Found image URL in legacy table for '{title}'")
+        conn.close()
+        return result[0], result[1] if len(result) > 1 and result[1] else ""
+    
+    conn.close()
+    
+    # If we have a Goodreads ID but no image URL, construct a high-quality image URL
+    if goodreads_id:
+        image_url = f"https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books//{goodreads_id}._SX318_.jpg"
+        
+        # Store in database for future use
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT OR REPLACE INTO book_covers (title, author, image_url, goodreads_id) VALUES (?, ?, ?, ?)",
+            (title, author, image_url, goodreads_id)
+        )
+        conn.commit()
+        conn.close()
+        
+        return image_url, goodreads_id
+    
+    # If we don't have the cover, try to scrape it from Goodreads
+    logger.info(f"Scraping data for '{title}' from Goodreads")
+    
+    try:
+        # Construct a search URL for Goodreads
+        search_query = f"{title} {author}".strip()
+        search_url = f"https://www.goodreads.com/search?q={quote_plus(search_query)}"
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        
+        response = requests.get(search_url, headers=headers)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Find the first book result
+            book_item = soup.select_one('tr.bookTitle')
+            
+            if book_item:
+                # Extract the book cover image
+                img_tag = book_item.select_one('img.bookCover')
+                if img_tag and 'src' in img_tag.attrs:
+                    image_url = img_tag['src']
+                    
+                    # Extract the Goodreads ID from the URL if possible
+                    book_link = book_item.select_one('a.bookTitle')
+                    if book_link and 'href' in book_link.attrs:
+                        book_url = book_link['href']
+                        id_match = re.search(r'/show/(\d+)', book_url)
+                        if id_match:
+                            extracted_goodreads_id = id_match.group(1)
+                            
+                            # Store in database for future use
+                            conn = get_db_connection()
+                            cursor = conn.cursor()
+                            cursor.execute(
+                                "INSERT OR REPLACE INTO book_covers (title, author, image_url, goodreads_id) VALUES (?, ?, ?, ?)",
+                                (title, author, image_url, extracted_goodreads_id)
+                            )
+                            conn.commit()
+                            conn.close()
+                            
+                            logger.info(f"Saved book data for '{title}' with Goodreads ID: {extracted_goodreads_id}")
+                            
+                            return image_url, extracted_goodreads_id
+                    
+                    # If we couldn't extract a Goodreads ID, just save the image URL
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO book_covers (title, author, image_url) VALUES (?, ?, ?)",
+                        (title, author, image_url)
+                    )
+                    conn.commit()
+                    conn.close()
+                    
+                    return image_url, ""
+    
+    except Exception as e:
+        logger.error(f"Error scraping Goodreads for '{title}': {str(e)}")
+    
+    # If all else fails, return empty strings
+    return "", ""
+
+def store_book_metadata(title: str, author: str, goodreads_id: str = None, image_url: str = None) -> bool:
+    """
+    Store book metadata in the database.
+    
+    Args:
+        title: Book title
+        author: Book author
+        goodreads_id: Optional Goodreads ID
+        image_url: Optional image URL
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    if not title:
+        return False
+        
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if we already have this book
+        if goodreads_id:
+            cursor.execute("SELECT id FROM book_covers WHERE goodreads_id = ?", (goodreads_id,))
+        else:
+            cursor.execute("SELECT id FROM book_covers WHERE title = ? AND author = ?", (title, author))
+            
+        result = cursor.fetchone()
+        
+        if result:
+            # Update existing record
+            if goodreads_id and image_url:
+                cursor.execute(
+                    "UPDATE book_covers SET image_url = ?, goodreads_id = ? WHERE id = ?",
+                    (image_url, goodreads_id, result[0])
+                )
+            elif goodreads_id:
+                cursor.execute(
+                    "UPDATE book_covers SET goodreads_id = ? WHERE id = ?",
+                    (goodreads_id, result[0])
+                )
+            elif image_url:
+                cursor.execute(
+                    "UPDATE book_covers SET image_url = ? WHERE id = ?",
+                    (image_url, result[0])
+                )
+        else:
+            # Insert new record
+            cursor.execute(
+                "INSERT INTO book_covers (title, author, image_url, goodreads_id) VALUES (?, ?, ?, ?)",
+                (title, author, image_url, goodreads_id)
+            )
+            
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        logger.error(f"Error storing book metadata: {str(e)}")
+        return False
+
+def get_book_by_goodreads_id(goodreads_id: str) -> Optional[LiteratureItem]:
+    """
+    Get a book by its Goodreads ID.
+    
+    Args:
+        goodreads_id: Goodreads ID
+        
+    Returns:
+        LiteratureItem or None if not found
+    """
+    if not goodreads_id:
+        return None
+        
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "SELECT title, author, image_url FROM book_covers WHERE goodreads_id = ?",
+            (goodreads_id,)
+        )
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            return LiteratureItem(
+                title=result[0],
+                author=result[1],
+                image_url=result[2],
+                goodreads_id=goodreads_id
+            )
+        return None
+    except Exception as e:
+        logger.error(f"Error getting book by Goodreads ID: {str(e)}")
+        return None
+
+def get_book_by_title(title: str, author: str = None) -> Optional[LiteratureItem]:
+    """
+    Get a book by its title and optional author.
+    
+    Args:
+        title: Book title
+        author: Optional author name
+        
+    Returns:
+        LiteratureItem or None if not found
+    """
+    if not title:
+        return None
+        
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        if author:
+            cursor.execute(
+                "SELECT title, author, image_url, goodreads_id FROM book_covers WHERE title = ? AND author = ?",
+                (title, author)
+            )
+        else:
+            cursor.execute(
+                "SELECT title, author, image_url, goodreads_id FROM book_covers WHERE title = ?",
+                (title,)
+            )
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            return LiteratureItem(
+                title=result[0],
+                author=result[1],
+                image_url=result[2],
+                goodreads_id=result[3] if len(result) > 3 else None
+            )
+        return None
+    except Exception as e:
+        logger.error(f"Error getting book by title: {str(e)}")
+        return None
+
 def test_recommendations(input_text="the brothers karamazov", session_id="test"):
     """
     Test function to check recommendation quality for a given input.
