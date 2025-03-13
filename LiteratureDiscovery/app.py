@@ -6,36 +6,40 @@ import random
 import re
 import hashlib
 import uuid
+import sqlite3
 import traceback
-from typing import Dict, List, Tuple, Set, Optional
 from datetime import datetime, timedelta
 from functools import wraps
 from collections import defaultdict
+from typing import Dict, List, Tuple, Set, Optional
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, make_response
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, make_response, session
 from cachetools import TTLCache
 import requests
 from dotenv import load_dotenv
 
 # Import from our new literature_logic module
-from literature_logic import (
+from LiteratureDiscovery import literature_logic
+from LiteratureDiscovery.literature_logic import (
     get_user_preferences, 
-    get_trending_literature, 
+    get_trending_literature,
+    get_literary_trends, 
     recommend_literature, 
     store_user_input, 
     init_db,
-    get_recommendations
+    get_recommendations,
+    get_book_by_goodreads_id
 )
 
 # Import book details functionality
-from book_details import extend_db_schema, book_cache, recs_cache
+from LiteratureDiscovery.book_details import extend_db_schema, book_cache, recs_cache
 
 # Import book routes
-from book_routes import register_book_routes
+from LiteratureDiscovery.book_routes import register_book_routes
 
 # Import models and database
-from models import LiteratureItem
-from database import get_user_history
+from LiteratureDiscovery.models import LiteratureItem
+from LiteratureDiscovery.database import get_user_history
 
 # Load environment variables
 load_dotenv()
@@ -52,7 +56,6 @@ openai_client = None
 try:
     # IMPORTANT: DO NOT CHANGE THIS CONFIGURATION WITHOUT EXPLICIT PERMISSION
     # This specific implementation is required for compatibility with OpenAI 0.28
-    # Changing to newer OpenAI patterns will break the application
     import openai
     openai.api_key = OPENAI_API_KEY
     openai_client = openai
@@ -776,7 +779,7 @@ def get_recommendations_route():
                 }), 404
             
             flash("Sorry, we couldn't find any recommendations for your input. Please try again with different literature.")
-            return redirect(url_for('home'))
+            return redirect('/')
         
         # Return the recommendations
         if request.is_json:
@@ -831,11 +834,402 @@ def api_trending():
         "items": [item.to_dict() for item in trending_items]
     })
 
+@app.route('/book/<goodreads_id>')
+def book_details(goodreads_id):
+    """
+    Display detailed information about a book.
+    """
+    try:
+        # Get session ID for tracking
+        session_id = session.get('session_id', str(uuid.uuid4()))
+        session['session_id'] = session_id
+        
+        # Get book information from the database
+        conn = sqlite3.connect(os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_history.db"))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Check if book is in reading list
+        cursor.execute("PRAGMA table_info(user_reading_list)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        is_saved = False
+        if 'id' in columns:
+            cursor.execute("SELECT id FROM user_reading_list WHERE session_id = ? AND goodreads_id = ?",
+                        (session_id, goodreads_id))
+        else:
+            cursor.execute("SELECT rowid FROM user_reading_list WHERE session_id = ? AND goodreads_id = ?",
+                        (session_id, goodreads_id))
+        
+        if cursor.fetchone():
+            is_saved = True
+        
+        # Try to get book details
+        title = None
+        author = None
+        image_url = None
+        
+        # 1. First try book_covers table
+        cursor.execute("SELECT * FROM book_covers WHERE goodreads_id = ?", (goodreads_id,))
+        book_data = cursor.fetchone()
+        
+        if book_data:
+            title = book_data['title']
+            author = book_data['author']
+            image_url = book_data['image_url']
+        else:
+            # 2. Try book_images table
+            cursor.execute("SELECT * FROM book_images WHERE goodreads_id = ?", (goodreads_id,))
+            book_images_data = cursor.fetchone()
+            
+            if book_images_data:
+                title = book_images_data['title']
+                image_url = book_images_data['image_url']
+                author = "Unknown Author"  # Default value
+                
+                # Store in book_covers for future reference
+                cursor.execute(
+                    "INSERT OR IGNORE INTO book_covers (goodreads_id, title, author, image_url) VALUES (?, ?, ?, ?)",
+                    (goodreads_id, title, author, image_url)
+                )
+                conn.commit()
+        
+        # 3. If still no data, try fetching from the module directly (if we have imported the module)
+        if not title and 'literature_logic' in globals():
+            book_from_logic = literature_logic.get_book_by_goodreads_id(goodreads_id)
+            if book_from_logic:
+                title = book_from_logic.title
+                author = book_from_logic.author
+                image_url = book_from_logic.image_url
+                
+                # Store in book_covers for future reference
+                cursor.execute(
+                    "INSERT OR IGNORE INTO book_covers (goodreads_id, title, author, image_url) VALUES (?, ?, ?, ?)",
+                    (goodreads_id, title, author or "Unknown Author", image_url or "")
+                )
+                conn.commit()
+        
+        # 4. Last resort: create placeholder
+        if not title:
+            title = f"Book {goodreads_id}"
+            author = "Unknown Author"
+            image_url = url_for('static', filename='images/placeholder-cover.svg')
+            
+            app.logger.warning(f"Book with goodreads_id {goodreads_id} not found anywhere - using placeholder")
+        
+        # Get additional book details from Perplexity API
+        book_info = get_book_details(title, author, goodreads_id)
+        
+        # Prepare data for the template
+        book = {
+            'title': title,
+            'author': author,
+            'image_url': image_url or url_for('static', filename='images/placeholder-cover.svg'),
+            'goodreads_id': goodreads_id,
+            'description': book_info.get('description', 'No description available.'),
+            'publication_date': book_info.get('publication_date', 'Unknown'),
+            'genre': book_info.get('genre', 'Unknown'),
+            'themes': book_info.get('themes', []),
+            'quotes': book_info.get('quotes', []),
+            'similar_books': book_info.get('similar_books', []),
+            'is_saved': is_saved,
+            'match_score': 75  # Add default match score to prevent template error
+        }
+        
+        conn.close()
+        
+        # Render the book details template
+        return render_template('book.html', book=book)
+    except Exception as e:
+        app.logger.error(f"Error displaying book details: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        # Still render the template with default info rather than redirecting
+        try:
+            default_book = {
+                'title': f"Book {goodreads_id}",
+                'author': "Unknown Author",
+                'image_url': url_for('static', filename='images/placeholder-cover.svg'),
+                'goodreads_id': goodreads_id,
+                'description': "Could not retrieve book details due to an error.",
+                'publication_date': "Unknown",
+                'genre': "Unknown",
+                'themes': [],
+                'quotes': [],
+                'similar_books': [],
+                'is_saved': False,
+                'match_score': 50  # Add default match score to prevent template error
+            }
+            return render_template('book.html', book=default_book)
+        except Exception as e2:
+            app.logger.error(f"Error rendering default book template: {str(e2)}")
+            # Last resort
+            return redirect('/')
+
+def get_book_details(title, author, goodreads_id=None):
+    """
+    Get detailed information about a book using the Perplexity API.
+    """
+    if not PERPLEXITY_API_KEY:
+        app.logger.error("Perplexity API key not configured")
+        return {}
+    
+    try:
+        # Prepare the prompt for Perplexity
+        prompt = f"""Provide detailed information about the book "{title}" by {author}. Include the following information in JSON format:
+        {{
+            "description": "A detailed description of the book's plot and themes (2-3 paragraphs)",
+            "publication_date": "Year of publication",
+            "genre": "Primary genre of the book",
+            "themes": ["List of 3-5 major themes in the book"],
+            "quotes": ["3-4 notable quotes from the book with attribution"],
+            "similar_books": [
+                {{
+                    "title": "Similar Book Title 1",
+                    "author": "Author Name",
+                    "reason": "Brief reason for recommendation"
+                }},
+                {{
+                    "title": "Similar Book Title 2",
+                    "author": "Author Name",
+                    "reason": "Brief reason for recommendation"
+                }},
+                {{
+                    "title": "Similar Book Title 3",
+                    "author": "Author Name",
+                    "reason": "Brief reason for recommendation"
+                }}
+            ]
+        }}
+        
+        Ensure your response is ONLY valid JSON with no additional text or explanations."""
+        
+        # IMPORTANT: DO NOT CHANGE THIS API CONFIGURATION WITHOUT EXPLICIT PERMISSION
+        response = requests.post(
+            "https://api.perplexity.ai/chat/completions",
+            headers={
+                "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "sonar",  # DO NOT CHANGE THIS MODEL NAME
+                "messages": [
+                    {
+                        "role": "system", 
+                        "content": "You are a literary expert providing detailed information about books in JSON format."
+                    },
+                    {
+                        "role": "user", 
+                        "content": prompt
+                    }
+                ],
+                "temperature": 0.3,
+                "max_tokens": 1000
+            }
+        )
+        
+        if response.status_code != 200:
+            app.logger.error(f"Perplexity API error: {response.status_code} - {response.text}")
+            return {}
+        
+        response_data = response.json()
+        content = response_data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+        
+        app.logger.info("Received response from Perplexity API for book details")
+        app.logger.info(f"Perplexity content preview for book details: {content[:200]}...")
+        
+        # Clean the content to ensure it's valid JSON
+        # Sometimes the API returns markdown code blocks with ```json
+        content = content.strip()
+        if content.startswith("```json"):
+            content = content[7:]  # Remove ```json
+        if content.endswith("```"):
+            content = content[:-3]  # Remove trailing ```
+        
+        content = content.strip()
+        
+        try:
+            book_info = json.loads(content)
+            return book_info
+        except json.JSONDecodeError as e:
+            app.logger.error(f"Failed to parse JSON response from Perplexity: {content[:200]}...")
+            app.logger.error(f"JSON decode error: {str(e)}")
+            return {}
+            
+    except Exception as e:
+        app.logger.error(f"Error fetching book details: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        return {}
+
+@app.route('/reading-list/add', methods=['POST'])
+def add_to_reading_list():
+    """
+    Add a book to the user's reading list.
+    """
+    try:
+        data = request.get_json()
+        goodreads_id = data.get('goodreads_id')
+        title = data.get('title')
+        
+        if not goodreads_id or not title:
+            return jsonify({'success': False, 'message': 'Missing required parameters'}), 400
+        
+        # Get session ID
+        session_id = session.get('session_id', str(uuid.uuid4()))
+        session['session_id'] = session_id
+        
+        # Connect to database
+        conn = sqlite3.connect(os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_history.db"))
+        cursor = conn.cursor()
+        
+        # Check if the book is already in the reading list
+        cursor.execute("SELECT * FROM user_reading_list WHERE session_id = ? AND goodreads_id = ?", 
+                      (session_id, goodreads_id))
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Remove from reading list
+            cursor.execute("DELETE FROM user_reading_list WHERE session_id = ? AND goodreads_id = ?", 
+                          (session_id, goodreads_id))
+            conn.commit()
+            conn.close()
+            return jsonify({'success': True, 'added': False, 'message': 'Book removed from reading list'})
+        else:
+            # Add to reading list
+            cursor.execute("INSERT INTO user_reading_list (session_id, goodreads_id, title, added_at) VALUES (?, ?, ?, ?)", 
+                          (session_id, goodreads_id, title, datetime.now().isoformat()))
+            conn.commit()
+            conn.close()
+            return jsonify({'success': True, 'added': True, 'message': 'Book added to reading list'})
+    
+    except Exception as e:
+        app.logger.error(f"Error adding to reading list: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'message': 'An error occurred'}), 500
+
+@app.route('/reading-list', methods=['GET'])
+def view_reading_list():
+    """
+    View the user's reading list.
+    """
+    try:
+        # Get session ID
+        session_id = session.get('session_id', str(uuid.uuid4()))
+        session['session_id'] = session_id
+        
+        # Connect to database
+        conn = sqlite3.connect(os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_history.db"))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Get books from reading list
+        cursor.execute("SELECT * FROM user_reading_list WHERE session_id = ? ORDER BY added_at DESC", (session_id,))
+        reading_list_items = cursor.fetchall()
+        
+        books = []
+        for item in reading_list_items:
+            goodreads_id = item['goodreads_id']
+            
+            # Get book details
+            cursor.execute("SELECT * FROM book_covers WHERE goodreads_id = ?", (goodreads_id,))
+            book_data = cursor.fetchone()
+            
+            if book_data:
+                books.append({
+                    'title': item['title'],
+                    'author': book_data['author'] if book_data else 'Unknown',
+                    'image_url': book_data['image_url'] if book_data else url_for('static', filename='images/placeholder-cover.svg'),
+                    'goodreads_id': goodreads_id,
+                    'added_at': item['added_at']
+                })
+        
+        conn.close()
+        
+        return render_template('reading_list.html', books=books)
+    
+    except Exception as e:
+        app.logger.error(f"Error viewing reading list: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        flash("An error occurred while retrieving your reading list. Please try again.")
+        return redirect('/')
+
 # Initialize the extended database schema for book functionality
+def extend_db_schema():
+    """
+    Extend the database schema to support book functionality.
+    """
+    try:
+        conn = sqlite3.connect(os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_history.db"))
+        cursor = conn.cursor()
+        
+        # Create tables if they don't exist
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS book_images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            goodreads_id TEXT UNIQUE,
+            title TEXT,
+            image_url TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+        
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS book_covers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            goodreads_id TEXT UNIQUE,
+            title TEXT,
+            author TEXT,
+            image_url TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+        
+        # Add user_reading_list table
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_reading_list (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT,
+            goodreads_id TEXT,
+            title TEXT,
+            added_at TIMESTAMP,
+            UNIQUE(session_id, goodreads_id)
+        )
+        ''')
+        
+        # Check if the user_reading_list table exists but has the wrong schema
+        cursor.execute("PRAGMA table_info(user_reading_list)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        # If the table exists but doesn't have the 'id' column, drop and recreate it
+        if columns and 'id' not in columns:
+            app.logger.info("Recreating user_reading_list table with correct schema")
+            cursor.execute("DROP TABLE user_reading_list")
+            cursor.execute('''
+            CREATE TABLE user_reading_list (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT,
+                goodreads_id TEXT,
+                title TEXT,
+                added_at TIMESTAMP,
+                UNIQUE(session_id, goodreads_id)
+            )
+            ''')
+        
+        conn.commit()
+        conn.close()
+        app.logger.info("Extended database schema with user_reading_list table")
+    except Exception as e:
+        app.logger.error(f"Error extending database schema: {str(e)}")
+
+# Call the function to extend the database schema
 extend_db_schema()
 
 # Register book routes
 app = register_book_routes(app)
+
+# Test route for debugging image issues
+@app.route('/test_images')
+def test_images():
+    return render_template('test_images.html')
 
 if __name__ == "__main__":
     # Print startup message
@@ -859,4 +1253,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Run the Flask application
-    app.run(debug=True, port=args.port)
+    app.run(host='0.0.0.0', debug=True, port=args.port)
