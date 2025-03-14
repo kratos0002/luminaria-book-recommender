@@ -13,13 +13,15 @@ from functools import wraps
 from collections import defaultdict
 from typing import Dict, List, Tuple, Set, Optional
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, make_response, session
+from flask import (
+    Flask, request, jsonify, render_template,
+    redirect, url_for, session, make_response, flash
+)
 from cachetools import TTLCache
 import requests
 from dotenv import load_dotenv
 
-# Import from our new literature_logic module
-from LiteratureDiscovery import literature_logic
+# Import local modules directly
 from LiteratureDiscovery.literature_logic import (
     get_user_preferences, 
     get_trending_literature,
@@ -28,14 +30,19 @@ from LiteratureDiscovery.literature_logic import (
     store_user_input, 
     init_db,
     get_recommendations,
-    get_book_by_goodreads_id
+    get_book_by_goodreads_id,
+    save_book,
+    manage_bookshelves,
+    update_book_status,
+    remove_saved_book,
+    get_my_books,
+    sync_saved_books_to_reading_list,
+    recommendations_cache
 )
 
 # Import book details functionality
-from LiteratureDiscovery.book_details import extend_db_schema, book_cache, recs_cache
-
-# Import book routes
 from LiteratureDiscovery.book_routes import register_book_routes
+from LiteratureDiscovery.book_details import extend_db_schema, book_cache, recs_cache
 
 # Import models and database
 from LiteratureDiscovery.models import LiteratureItem
@@ -46,7 +53,9 @@ load_dotenv()
 
 # Configure the application
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24).hex())  # Add secret key for session managementapp.logger.setLevel(logging.INFO)
+app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24).hex())  # Add secret key for session management
+logging.basicConfig(level=logging.INFO)
+app.logger.setLevel(logging.INFO)
 
 # Initialize API clients
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -766,11 +775,26 @@ def get_recommendations_route():
         
         app.logger.info(f"Processing recommendation request for: {literature_input}")
         
+        # Check if we have cached results for this input
+        normalized_input = literature_input.lower().strip()
+        memory_cache_key = f"{normalized_input}_{session_id or 'anonymous'}"
+        is_cached = memory_cache_key in recs_cache
+        
+        start_time = time.time()
+        
         # Get recommendations using the new combined function
         result = get_recommendations(literature_input, session_id)
         
+        processing_time = time.time() - start_time
+        app.logger.info(f"Recommendation processing time: {processing_time:.2f} seconds (cached: {is_cached})")
+        
         # Check if we got any recommendations
-        if (not result.get('core') and not result.get('trending')) or (len(result.get('core', [])) == 0 and len(result.get('trending', [])) == 0):
+        has_core = len(result.get('core', [])) > 0
+        has_trending = len(result.get('trending', [])) > 0
+        has_segmented = any(len(items) > 0 for items in result.get('segmented_recommendations', {}).values())
+        has_news = len(result.get('news_and_social', [])) > 0
+        
+        if not (has_core or has_trending or has_segmented or has_news):
             app.logger.warning(f"No recommendations found for: {literature_input}")
             if request.is_json:
                 return jsonify({
@@ -786,7 +810,12 @@ def get_recommendations_route():
             return jsonify({
                 "recommendations": {
                     "core": [(item.to_dict(), score, terms) for item, score, terms in result.get('core', [])],
-                    "trending": [(item.to_dict(), score, terms) for item, score, terms in result.get('trending', [])]
+                    "trending": [(item.to_dict(), score, terms) for item, score, terms in result.get('trending', [])],
+                    "news_and_social": result.get('news_and_social', []),
+                    "segmented_recommendations": {
+                        category: [(item.to_dict(), score, terms) for item, score, terms in items]
+                        for category, items in result.get('segmented_recommendations', {}).items()
+                    }
                 },
                 "terms": result.get('terms', []),
                 "context_description": result.get('context_description'),
@@ -802,9 +831,12 @@ def get_recommendations_route():
                 "terms": result.get('terms', []),
                 "context_description": result.get('context_description'),
                 "history": result.get('history', []),
+                "news_and_social": result.get('news_and_social', []),
+                "segmented_recommendations": result.get('segmented_recommendations', {}),
                 "input": literature_input
             },
-            cached=False
+            cached=is_cached,
+            processing_time=processing_time
         ))
         
         # Set the session cookie
@@ -926,6 +958,7 @@ def book_details(goodreads_id):
             'author': author,
             'image_url': image_url or url_for('static', filename='images/placeholder-cover.svg'),
             'goodreads_id': goodreads_id,
+            'has_valid_goodreads_id': goodreads_id is not None and goodreads_id.isdigit(),
             'description': book_info.get('description', 'No description available.'),
             'publication_date': book_info.get('publication_date', 'Unknown'),
             'genre': book_info.get('genre', 'Unknown'),
@@ -950,6 +983,7 @@ def book_details(goodreads_id):
                 'author': "Unknown Author",
                 'image_url': url_for('static', filename='images/placeholder-cover.svg'),
                 'goodreads_id': goodreads_id,
+                'has_valid_goodreads_id': goodreads_id is not None and goodreads_id.isdigit(),
                 'description': "Could not retrieve book details due to an error.",
                 'publication_date': "Unknown",
                 'genre': "Unknown",
@@ -1231,6 +1265,349 @@ app = register_book_routes(app)
 def test_images():
     return render_template('test_images.html')
 
+# My Books feature routes
+@app.route('/my_books', methods=['GET'])
+def my_books():
+    """
+    Display the user's saved books, bookshelves, and personalized recommendations.
+    """
+    try:
+        # Get the user's session ID (create one if it doesn't exist)
+        session_id = request.cookies.get('session_id')
+        if not session_id:
+            session_id = str(uuid.uuid4())
+        
+        # Log the session ID for debugging
+        app.logger.info(f"My Books route - Using session ID: {session_id}")
+        
+        # Copy books from saved_books to user_reading_list for backward compatibility
+        sync_saved_books_to_reading_list(session_id)
+        
+        # Get filter parameters
+        shelf_filter = request.args.get('shelf')
+        status_filter = request.args.get('status')
+        
+        # Get the user's books and bookshelves
+        books, bookshelves, recommendations = get_my_books(session_id, shelf_filter, status_filter)
+        
+        # Debug log
+        app.logger.info(f"Retrieved {len(books)} books for session {session_id}")
+        
+        # Render the template with the data
+        response = make_response(render_template(
+            'my_books.html',
+            books=books,
+            bookshelves=bookshelves,
+            recommendations=recommendations,
+            current_shelf=shelf_filter,
+            current_status=status_filter
+        ))
+        
+        # Set the session ID cookie if it doesn't exist
+        if not request.cookies.get('session_id'):
+            response.set_cookie('session_id', session_id, max_age=60*60*24*365)  # 1 year
+        
+        return response
+    except Exception as e:
+        app.logger.error(f"Error getting my books: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        flash("An error occurred. Please try again later.")
+        return redirect('/')
+
+@app.route('/save_book', methods=['POST'])
+def save_book_route():
+    """
+    Save a book to the user's "My Books" collection.
+    """
+    try:
+        # Get the user's session ID
+        session_id = request.cookies.get('session_id')
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            app.logger.info(f"Save Book route - Created new session ID: {session_id}")
+        else:
+            app.logger.info(f"Save Book route - Using existing session ID: {session_id}")
+        
+        # Parse the request data
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form
+        
+        # Get the book details
+        goodreads_id = data.get('goodreads_id')
+        title = data.get('title')
+        author = data.get('author')
+        image_url = data.get('image_url', '')
+        
+        if not goodreads_id or not title or not author:
+            return jsonify({"error": "Missing required book information"}), 400
+        
+        # Save the book
+        saved_book_id = save_book(session_id, goodreads_id, title, author, image_url)
+        
+        if saved_book_id:
+            response = jsonify({"success": True, "saved_book_id": saved_book_id, "action": "added"})
+            
+            # Set the session ID cookie if it was newly created
+            if not request.cookies.get('session_id'):
+                response.set_cookie('session_id', session_id, max_age=60*60*24*365)  # 1 year
+                
+            return response
+        else:
+            return jsonify({"error": "Failed to save book"}), 500
+    except Exception as e:
+        app.logger.error(f"Error saving book: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/update_book_status', methods=['POST'])
+def update_book_status_route():
+    """
+    Update the reading status and/or progress of a saved book.
+    """
+    try:
+        # Get the user's session ID
+        session_id = request.cookies.get('session_id')
+        if not session_id:
+            return jsonify({"error": "Session ID not found"}), 400
+        
+        # Parse the request data
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form
+        
+        # Get the book details
+        saved_book_id = data.get('saved_book_id')
+        status = data.get('status')
+        progress = data.get('progress')
+        
+        if not saved_book_id:
+            return jsonify({"error": "Missing saved book ID"}), 400
+        
+        # Convert saved_book_id to int
+        try:
+            saved_book_id = int(saved_book_id)
+        except ValueError:
+            return jsonify({"error": "Invalid saved book ID"}), 400
+        
+        # Convert progress to int if provided
+        if progress is not None:
+            try:
+                progress = int(progress)
+            except ValueError:
+                return jsonify({"error": "Invalid progress value"}), 400
+        
+        # Update the book status
+        success = update_book_status(session_id, saved_book_id, status, progress)
+        
+        if success:
+            return jsonify({"success": True})
+        else:
+            return jsonify({"error": "Failed to update book status"}), 500
+    except Exception as e:
+        app.logger.error(f"Error updating book status: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/manage_bookshelf', methods=['POST'])
+def manage_bookshelf_route():
+    """
+    Add or remove a book from a bookshelf.
+    """
+    try:
+        # Get the user's session ID
+        session_id = request.cookies.get('session_id')
+        if not session_id:
+            return jsonify({"error": "Session ID not found"}), 400
+        
+        # Parse the request data
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form
+        
+        # Get the request details
+        saved_book_id = data.get('saved_book_id')
+        shelf_name = data.get('shelf_name')
+        action = data.get('action', 'add')  # Default to 'add'
+        
+        if not saved_book_id or not shelf_name:
+            return jsonify({"error": "Missing required parameters"}), 400
+        
+        # Convert saved_book_id to int
+        try:
+            saved_book_id = int(saved_book_id)
+        except ValueError:
+            return jsonify({"error": "Invalid saved book ID"}), 400
+        
+        # Manage the bookshelf
+        success = manage_bookshelves(session_id, saved_book_id, shelf_name, action)
+        
+        if success:
+            return jsonify({"success": True})
+        else:
+            return jsonify({"error": "Failed to manage bookshelf"}), 500
+    except Exception as e:
+        app.logger.error(f"Error managing bookshelf: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/remove_book', methods=['POST'])
+def remove_book_route():
+    """
+    Remove a book from the user's saved collection.
+    """
+    try:
+        # Get the user's session ID
+        session_id = request.cookies.get('session_id')
+        if not session_id:
+            return jsonify({"error": "Session ID not found"}), 400
+        
+        # Parse the request data
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form
+        
+        # Get the book ID
+        saved_book_id = data.get('saved_book_id')
+        
+        if not saved_book_id:
+            return jsonify({"error": "Missing saved book ID"}), 400
+        
+        # Convert saved_book_id to int
+        try:
+            saved_book_id = int(saved_book_id)
+        except ValueError:
+            return jsonify({"error": "Invalid saved book ID"}), 400
+        
+        # Remove the book
+        success = remove_saved_book(session_id, saved_book_id)
+        
+        if success:
+            return jsonify({"success": True})
+        else:
+            return jsonify({"error": "Failed to remove book"}), 500
+    except Exception as e:
+        app.logger.error(f"Error removing book: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/debug_saved_books', methods=['GET'])
+def debug_saved_books():
+    """
+    Debug route to directly display saved books from the database.
+    """
+    try:
+        # Get the user's session ID
+        session_id = request.cookies.get('session_id')
+        if not session_id:
+            return "No session ID found. Please save a book first."
+        
+        # Connect to the database
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_history.db")
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row  # This enables column access by name
+        cursor = conn.cursor()
+        
+        # Query saved_books table
+        cursor.execute(
+            "SELECT * FROM saved_books WHERE session_id = ?",
+            (session_id,)
+        )
+        saved_books = cursor.fetchall()
+        
+        # Query user_reading_list table
+        cursor.execute(
+            "SELECT * FROM user_reading_list WHERE session_id = ?",
+            (session_id,)
+        )
+        reading_list = cursor.fetchall()
+        
+        # Close the connection
+        conn.close()
+        
+        # Prepare HTML output
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Debug Saved Books</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                h1, h2 {{ color: #333; }}
+                table {{ border-collapse: collapse; width: 100%; margin-bottom: 30px; }}
+                th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                th {{ background-color: #f2f2f2; }}
+                tr:nth-child(even) {{ background-color: #f9f9f9; }}
+            </style>
+        </head>
+        <body>
+            <h1>Debug Saved Books</h1>
+            <p>Session ID: {session_id}</p>
+            
+            <h2>Saved Books Table ({len(saved_books)} books)</h2>
+            <table>
+                <tr>
+                    <th>ID</th>
+                    <th>Goodreads ID</th>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Status</th>
+                    <th>Progress</th>
+                    <th>Added Date</th>
+                </tr>
+        """
+        
+        for book in saved_books:
+            html += f"""
+                <tr>
+                    <td>{book['id']}</td>
+                    <td>{book['goodreads_id']}</td>
+                    <td>{book['title']}</td>
+                    <td>{book['author']}</td>
+                    <td>{book['status']}</td>
+                    <td>{book['progress']}</td>
+                    <td>{book['added_date']}</td>
+                </tr>
+            """
+        
+        html += f"""
+            </table>
+            
+            <h2>Reading List Table ({len(reading_list)} books)</h2>
+            <table>
+                <tr>
+                    <th>ID</th>
+                    <th>Goodreads ID</th>
+                    <th>Title</th>
+                    <th>Added At</th>
+                </tr>
+        """
+        
+        for book in reading_list:
+            html += f"""
+                <tr>
+                    <td>{book['id']}</td>
+                    <td>{book['goodreads_id']}</td>
+                    <td>{book['title']}</td>
+                    <td>{book['added_at']}</td>
+                </tr>
+            """
+        
+        html += f"""
+            </table>
+            
+            <p><a href="/my_books">Go to My Books Page</a></p>
+        </body>
+        </html>
+        """
+        
+        return html
+        
+    except Exception as e:
+        app.logger.error(f"Error in debug_saved_books: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        return f"Error: {str(e)}"
+
 if __name__ == "__main__":
     # Print startup message
     print("Caching enabled for Luminaria") if CACHING_ENABLED else print("Caching disabled for Luminaria")
@@ -1253,4 +1630,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Run the Flask application
-    app.run(host='0.0.0.0', debug=True, port=args.port)
+    app.run(debug=True, host='0.0.0.0', port=args.port)

@@ -4,193 +4,168 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ book.title }} | Luminaria</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dark-theme.css') }}">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        /* General Layout */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f5f7fa;
-            margin: 0;
-            padding: 0;
+        /* Book Page Specific Styles */
+        .book-container {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
         }
         
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        /* Header */
-        header {
-            margin-bottom: 30px;
+        .book-header {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
         
         .back-link {
-            display: inline-block;
-            margin-bottom: 15px;
-            color: #4a6fa5;
+            display: inline-flex;
+            align-items: center;
+            color: var(--accent-color);
             text-decoration: none;
             font-weight: 500;
+            margin-bottom: 1rem;
+            transition: color 0.2s;
         }
         
         .back-link:hover {
-            text-decoration: underline;
+            color: var(--accent-hover);
         }
         
-        h1 {
-            margin: 0 0 5px 0;
-            color: #2c3e50;
+        .back-link i {
+            margin-right: 0.5rem;
+        }
+        
+        .book-title {
+            margin: 0;
             font-size: 2.2rem;
+            color: var(--text-color);
+            font-weight: 700;
         }
         
         .book-meta {
-            color: #666;
+            color: var(--text-secondary);
             font-size: 1.1rem;
-            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
         }
         
-        /* Card Layout */
-        .card-grid {
+        .book-meta .separator {
+            color: var(--border-color);
+        }
+        
+        /* Two Column Layout */
+        .book-content {
             display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
         }
         
-        @media (max-width: 768px) {
-            .card-grid {
+        @media (max-width: 1024px) {
+            .book-content {
                 grid-template-columns: 1fr;
             }
         }
         
-        .card {
-            background-color: #fff;
+        /* Book Cover */
+        .book-cover {
+            background-color: var(--secondary-bg);
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            padding: 20px;
-            margin-bottom: 20px;
-            border-left: 4px solid #4a6fa5;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            height: 400px;
+            margin-bottom: 2rem;
         }
         
-        .card h2 {
-            margin-top: 0;
-            color: #2c3e50;
-            font-size: 1.4rem;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
+        .book-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .placeholder-cover {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--secondary-bg);
+        }
+        
+        /* Book Details */
+        .book-details {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        
+        .book-summary {
+            line-height: 1.7;
         }
         
         /* Match Score */
         .match-score {
-            font-weight: bold;
-            padding: 5px 10px;
-            border-radius: 20px;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-weight: 600;
             font-size: 0.9rem;
-            margin-bottom: 15px;
         }
         
         .score-high {
-            background-color: #e8f5e9;
-            color: #2e7d32;
+            background-color: rgba(46, 125, 50, 0.2);
+            color: #4CAF50;
         }
         
         .score-medium {
-            background-color: #fff8e1;
-            color: #f57f17;
+            background-color: rgba(245, 127, 23, 0.2);
+            color: #FF9800;
         }
         
         .score-low {
-            background-color: #ffebee;
-            color: #c62828;
+            background-color: rgba(198, 40, 40, 0.2);
+            color: #F44336;
         }
         
-        /* Lists */
-        .list-item {
-            margin-bottom: 15px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #eee;
+        /* Cards */
+        .card {
+            background-color: var(--secondary-bg);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
         }
         
-        .list-item:last-child {
-            border-bottom: none;
+        .card h2 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 1.4rem;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
         
-        .list-item .source {
-            font-weight: bold;
-            color: #4a6fa5;
-        }
-        
-        .list-item .date {
-            font-size: 0.85rem;
-            color: #888;
-        }
-        
-        /* Quotes */
-        .quote {
-            font-style: italic;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            position: relative;
-        }
-        
-        .quote::before {
-            content: """;
-            font-size: 3rem;
-            color: #ddd;
-            position: absolute;
-            top: -10px;
-            left: 5px;
-        }
-        
-        .quote-block::before {
-            content: """;
-            font-size: 3rem;
-            color: #ddd;
-            position: absolute;
-            top: -10px;
-            left: 5px;
-        }
-        
-        /* Related Books */
-        .related-book {
-            margin-bottom: 15px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .related-book:last-child {
-            border-bottom: none;
-        }
-        
-        .related-book h3 {
-            margin: 0 0 5px 0;
-            font-size: 1.1rem;
-        }
-        
-        .related-book .author {
-            color: #666;
-            font-size: 0.9rem;
-        }
-        
-        .related-book .reason {
-            font-style: italic;
-            margin-top: 5px;
-            font-size: 0.9rem;
+        .card h2 i {
+            color: var(--accent-color);
         }
         
         /* Action Buttons */
         .action-buttons {
             display: flex;
-            gap: 10px;
-            margin-top: 20px;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1.5rem;
         }
         
         .btn {
-            padding: 8px 15px;
+            padding: 0.75rem 1.25rem;
             border-radius: 4px;
             cursor: pointer;
             font-weight: 500;
@@ -199,7 +174,7 @@
             font-size: 0.9rem;
             display: flex;
             align-items: center;
-            justify-content: center;
+            gap: 0.5rem;
         }
         
         .btn:hover {
@@ -207,13 +182,22 @@
         }
         
         .btn-primary {
-            background-color: #4a6fa5;
+            background-color: var(--accent-color);
             color: white;
         }
         
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+        
         .btn-secondary {
-            background-color: #e9ecef;
-            color: #495057;
+            background-color: var(--secondary-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-secondary:hover {
+            background-color: var(--hover-bg);
         }
         
         .btn-success {
@@ -221,67 +205,146 @@
             color: white;
         }
         
-        .btn-icon {
-            margin-right: 5px;
+        .btn-success:hover {
+            background-color: #218838;
         }
         
-        /* Feedback Buttons */
-        .feedback-buttons {
+        /* Lists */
+        .list-item {
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .list-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        
+        /* Quotes */
+        .quote {
+            font-style: italic;
+            padding: 1.5rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            position: relative;
+            border-left: 3px solid var(--accent-color);
+        }
+        
+        .quote:last-child {
+            margin-bottom: 0;
+        }
+        
+        /* Related Books */
+        .related-books {
             display: flex;
-            gap: 10px;
-            margin-top: 15px;
+            flex-direction: column;
+            gap: 1rem;
         }
         
-        .feedback-btn {
-            cursor: pointer;
-            background: none;
-            border: 1px solid #ddd;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
+        .related-book {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .related-book:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        
+        .related-book h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+        
+        .related-book .author {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        .related-book .reason {
+            font-style: italic;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        /* Similar Books Section */
+        .similar-books {
+            margin-top: 2rem;
+        }
+        
+        .similar-books h2 {
+            margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            transition: all 0.3s;
+            gap: 0.5rem;
         }
         
-        .feedback-btn:hover {
-            transform: scale(1.1);
+        .books-scroll {
+            display: flex;
+            gap: 1.5rem;
+            overflow-x: auto;
+            padding-bottom: 1rem;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
         }
         
-        .feedback-btn.thumbs-up:hover {
-            border-color: #4CAF50;
-            color: #4CAF50;
+        .books-scroll::-webkit-scrollbar {
+            height: 8px;
         }
         
-        .feedback-btn.thumbs-down:hover {
-            border-color: #F44336;
-            color: #F44336;
+        .books-scroll::-webkit-scrollbar-track {
+            background: transparent;
         }
         
-        .feedback-btn.active.thumbs-up {
-            background-color: #E8F5E9;
-            border-color: #4CAF50;
-            color: #4CAF50;
+        .books-scroll::-webkit-scrollbar-thumb {
+            background-color: var(--border-color);
+            border-radius: 20px;
         }
         
-        .feedback-btn.active.thumbs-down {
-            background-color: #FFEBEE;
-            border-color: #F44336;
-            color: #F44336;
+        .book-card-small {
+            min-width: 200px;
+            background-color: var(--secondary-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
         }
         
-        .feedback-message {
+        .book-card-small:hover {
+            transform: translateY(-5px);
+        }
+        
+        .book-card-small .cover {
+            height: 200px;
+            background-color: var(--primary-bg);
+        }
+        
+        .book-card-small .cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .book-card-small .info {
+            padding: 1rem;
+        }
+        
+        .book-card-small .title {
+            font-weight: 600;
+            margin: 0 0 0.5rem 0;
+            font-size: 1rem;
+        }
+        
+        .book-card-small .author {
+            color: var(--text-secondary);
             font-size: 0.9rem;
-            color: #4CAF50;
-            margin-left: 10px;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        
-        .feedback-message.active {
-            opacity: 1;
+            margin: 0;
         }
         
         /* Toast Notification */
@@ -289,11 +352,11 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background-color: #4CAF50;
+            background-color: var(--accent-color);
             color: white;
             padding: 15px 25px;
             border-radius: 4px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             opacity: 0;
             transition: opacity 0.3s;
             z-index: 1000;
@@ -302,122 +365,195 @@
         .toast.active {
             opacity: 1;
         }
+        
+        /* Animation */
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+            opacity: 0;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <a href="/recommendations" class="back-link">← Back to Recommendations</a>
-            <h1>{{ book.title }}</h1>
-            <div class="book-meta">
-                <span class="author">By {{ book.author }}</span> • 
-                <span class="type">{{ book.type }}</span>
-                {% if book.year and book.year != "Unknown" %}
-                • <span class="year">{{ book.year }}</span>
-                {% endif %}
-            </div>
+            <a href="/" class="logo">
+                <i class="fas fa-book-open"></i>
+                <span>Luminaria</span>
+            </a>
+            <nav>
+                <ul>
+                    <li><a href="/my_books"><i class="fas fa-bookmark"></i> My Books</a></li>
+                    <li><a href="/"><i class="fas fa-search"></i> New Search</a></li>
+                </ul>
+            </nav>
         </header>
         
-        <div class="card-grid">
-            <!-- Left Column (2/3 width) -->
-            <div class="main-column">
-                <!-- Basic Info Card -->
-                <div class="card basic-info">
-                    <h2>About This Book</h2>
-                    
-                    <div class="match-info">
-                        <p class="match-score {% if book.match_score >= 80 %}score-high{% elif book.match_score >= 50 %}score-medium{% else %}score-low{% endif %}">
-                            Match Score: {{ book.match_score }}/100
-                        </p>
-                    </div>
-                    
-                    <p class="summary">{{ book.summary }}</p>
-                    
-                    <div class="action-buttons">
-                        <button id="save-button" class="btn {% if book.saved %}btn-success{% else %}btn-primary{% endif %}" data-title="{{ book.title }}">
-                            <span class="btn-icon">{% if book.saved %}✓{% else %}+{% endif %}</span>
-                            {% if book.saved %}Saved to Reading List{% else %}Save to Reading List{% endif %}
-                        </button>
-                        <button id="share-button" class="btn btn-secondary" data-title="{{ book.title }}">
-                            <span class="btn-icon">🔗</span>
-                            Share
-                        </button>
-                    </div>
-                    
-                    <div class="feedback-buttons">
-                        <button class="feedback-btn thumbs-up" data-title="{{ book.title }}" data-feedback="1" title="This recommendation is helpful">👍</button>
-                        <button class="feedback-btn thumbs-down" data-title="{{ book.title }}" data-feedback="-1" title="This recommendation is not helpful">👎</button>
-                        <span class="feedback-message">Thanks for your feedback!</span>
-                    </div>
-                </div>
-                
-                <!-- News Cards -->
-                <div class="card news">
-                    <h2>X Buzz</h2>
-                    {% if book.news_x %}
-                        {% for item in book.news_x %}
-                        <div class="list-item">
-                            <p>{{ item }}</p>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <p>No recent mentions on X found.</p>
-                    {% endif %}
-                </div>
-                
-                <div class="card news">
-                    <h2>Web Mentions</h2>
-                    {% if book.news_web %}
-                        {% for item in book.news_web %}
-                        <div class="list-item">
-                            <p>{{ item }}</p>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <p>No recent web mentions found.</p>
+        <div class="book-container animate-fade-in">
+            <div class="book-header">
+                <a href="/recommendations" class="back-link">
+                    <i class="fas fa-arrow-left"></i> Back to Recommendations
+                </a>
+                <h1 class="book-title">{{ book.title }}</h1>
+                <div class="book-meta">
+                    <span class="author">By {{ book.author }}</span>
+                    <span class="separator">•</span>
+                    <span class="type">{{ book.type }}</span>
+                    {% if book.year and book.year != "Unknown" %}
+                    <span class="separator">•</span>
+                    <span class="year">{{ book.year }}</span>
                     {% endif %}
                 </div>
             </div>
             
-            <!-- Right Column (1/3 width) -->
-            <div class="side-column">
-                <!-- Quotes Card -->
-                <div class="card quotes">
-                    <h2>Notable Quotes</h2>
-                    {% if book.quotes %}
-                        {% for quote in book.quotes %}
-                        <div class="quote">
-                            <p>{{ quote }}</p>
+            <div class="book-content">
+                <!-- Left Column - Book Details -->
+                <div class="book-main">
+                    <div class="book-cover">
+                        {% if book.image_url %}
+                        <img src="{{ book.image_url }}" alt="{{ book.title }}">
+                        {% else %}
+                        <div class="placeholder-cover">
+                            <i class="fas fa-book fa-5x" style="color: var(--border-color);"></i>
                         </div>
-                        {% endfor %}
-                    {% else %}
-                        <p>No notable quotes available.</p>
-                    {% endif %}
-                </div>
-                
-                <!-- Related Books Card -->
-                <div class="card related">
-                    <h2>Related Books</h2>
-                    {% if book.related %}
-                        {% for related in book.related %}
-                        <div class="related-book">
-                            <h3><a href="/book?title={{ related.title|urlencode }}">{{ related.title }}</a></h3>
-                            <p class="author">By {{ related.author }}</p>
-                            <p class="type">{{ related.type }}</p>
-                            {% if related.reason %}
-                            <p class="reason">{{ related.reason }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="book-details">
+                        <div class="card">
+                            <h2><i class="fas fa-info-circle"></i> About This Book</h2>
+                            
+                            <div class="match-info">
+                                <span class="match-score {% if book.match_score >= 80 %}score-high{% elif book.match_score >= 50 %}score-medium{% else %}score-low{% endif %}">
+                                    <i class="fas fa-percentage"></i> Match: {{ book.match_score }}/100
+                                </span>
+                                {% if book.has_valid_goodreads_id %}
+                                <span class="goodreads-link">
+                                    <a href="https://www.goodreads.com/book/show/{{ book.goodreads_id }}" target="_blank" rel="noopener noreferrer">
+                                        <i class="fab fa-goodreads-g"></i> View on Goodreads
+                                    </a>
+                                </span>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="book-summary">
+                                <p>{{ book.summary }}</p>
+                            </div>
+                            
+                            <div class="action-buttons">
+                                <button id="save-button" class="btn {% if book.is_saved %}btn-success{% else %}btn-primary{% endif %}" 
+                                        data-title="{{ book.title }}" 
+                                        data-author="{{ book.author }}"
+                                        data-image-url="{{ book.image_url|default('') }}"
+                                        data-goodreads-id="{{ book.goodreads_id }}">
+                                    <i class="fas {% if book.is_saved %}fa-check{% else %}fa-bookmark{% endif %}"></i>
+                                    {% if book.is_saved %}Saved to My Books{% else %}Save to My Books{% endif %}
+                                </button>
+                                <button id="share-button" class="btn btn-secondary" data-title="{{ book.title }}">
+                                    <i class="fas fa-share-alt"></i> Share
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- News Cards -->
+                        <div class="card">
+                            <h2><i class="fab fa-twitter"></i> X Buzz</h2>
+                            {% if book.news_x %}
+                                {% for item in book.news_x %}
+                                <div class="list-item">
+                                    <p>{{ item }}</p>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p>No recent mentions on X found.</p>
                             {% endif %}
                         </div>
-                        {% endfor %}
-                    {% else %}
-                        <p>No related books found.</p>
-                    {% endif %}
+                        
+                        <div class="card">
+                            <h2><i class="fas fa-globe"></i> Web Mentions</h2>
+                            {% if book.news_web %}
+                                {% for item in book.news_web %}
+                                <div class="list-item">
+                                    <p>{{ item }}</p>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p>No recent web mentions found.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Right Column - Sidebar -->
+                <div class="book-sidebar">
+                    <!-- Quotes Card -->
+                    <div class="card">
+                        <h2><i class="fas fa-quote-left"></i> Notable Quotes</h2>
+                        {% if book.quotes %}
+                            {% for quote in book.quotes %}
+                            <div class="quote">
+                                <p>{{ quote }}</p>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p>No notable quotes available.</p>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Related Books Card -->
+                    <div class="card">
+                        <h2><i class="fas fa-book"></i> Related Books</h2>
+                        {% if book.related %}
+                            <div class="related-books">
+                                {% for related in book.related %}
+                                <div class="related-book">
+                                    <h3><a href="/book/{{ related.id }}">{{ related.title }}</a></h3>
+                                    <p class="author">By {{ related.author }}</p>
+                                    {% if related.reason %}
+                                    <p class="reason">{{ related.reason }}</p>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p>No related books found.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Similar Books Section with Horizontal Scrolling -->
+            <div class="similar-books">
+                <h2><i class="fas fa-books"></i> Similar Books You Might Enjoy</h2>
+                
+                <div class="books-scroll">
+                    {% for related in book.related %}
+                    <a href="/book?title={{ related.title | urlencode }}&goodreads_id={{ related.goodreads_id | urlencode }}" class="book-card-small">
+                        <div class="cover">
+                            {% if related.image_url %}
+                            <img src="{{ related.image_url }}" alt="{{ related.title }}">
+                            {% else %}
+                            <div class="placeholder-cover">
+                                <i class="fas fa-book fa-2x" style="color: var(--border-color);"></i>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="info">
+                            <h3 class="title">{{ related.title }}</h3>
+                            <p class="author">By {{ related.author }}</p>
+                        </div>
+                    </a>
+                    {% endfor %}
                 </div>
             </div>
         </div>
         
         <footer>
-            <p>&copy; 2025 Luminaria - Powered by Perplexity API</p>
+            <p>Powered by Luminaria &copy; 2025</p>
         </footer>
     </div>
     
@@ -426,97 +562,78 @@
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Save to Reading List
+            // Save to My Books functionality
             const saveButton = document.getElementById('save-button');
             if (saveButton) {
                 saveButton.addEventListener('click', function() {
+                    const goodreadsId = this.getAttribute('data-goodreads-id');
                     const title = this.getAttribute('data-title');
+                    const author = this.getAttribute('data-author');
+                    const imageUrl = this.getAttribute('data-image-url');
                     
-                    fetch('/save', {
+                    // Send AJAX request to save/unsave the book
+                    fetch('/save_book', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                            title: title
+                            goodreads_id: goodreadsId,
+                            title: title,
+                            author: author,
+                            image_url: imageUrl
                         })
                     })
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
                             // Update button appearance
-                            this.classList.remove('btn-primary');
-                            this.classList.add('btn-success');
-                            this.innerHTML = '<span class="btn-icon">✓</span> Saved to Reading List';
-                            
-                            // Show toast
-                            showToast('Added to your reading list!');
+                            if (data.action === 'added') {
+                                saveButton.innerHTML = '<i class="fas fa-check"></i> Saved to My Books';
+                                saveButton.classList.remove('btn-primary');
+                                saveButton.classList.add('btn-success');
+                                showToast('Book added to your My Books!');
+                            } else {
+                                saveButton.innerHTML = '<i class="fas fa-bookmark"></i> Save to My Books';
+                                saveButton.classList.remove('btn-success');
+                                saveButton.classList.add('btn-primary');
+                                showToast('Book removed from your My Books.');
+                            }
                         } else {
-                            showToast('Error saving to reading list');
+                            showToast('Error: ' + data.message);
                         }
                     })
                     .catch(error => {
-                        console.error('Error saving to reading list:', error);
-                        showToast('Error saving to reading list');
+                        console.error('Error:', error);
+                        showToast('An error occurred. Please try again.');
                     });
                 });
             }
             
-            // Share Button
+            // Share button functionality
             const shareButton = document.getElementById('share-button');
             if (shareButton) {
                 shareButton.addEventListener('click', function() {
                     const title = this.getAttribute('data-title');
                     const url = window.location.href;
                     
-                    // Copy to clipboard
-                    navigator.clipboard.writeText(url).then(() => {
-                        showToast('Link copied to clipboard!');
-                    }, () => {
-                        showToast('Failed to copy link');
-                    });
+                    // Use Web Share API if available
+                    if (navigator.share) {
+                        navigator.share({
+                            title: title,
+                            text: `Check out this book: ${title}`,
+                            url: url,
+                        })
+                        .then(() => showToast('Shared successfully!'))
+                        .catch((error) => console.error('Error sharing:', error));
+                    } else {
+                        // Fallback: copy to clipboard
+                        navigator.clipboard.writeText(url)
+                            .then(() => showToast('Link copied to clipboard!'))
+                            .catch(() => showToast('Unable to copy link.'));
+                    }
                 });
             }
-            
-            // Feedback Buttons
-            document.querySelectorAll('.feedback-btn').forEach(button => {
-                button.addEventListener('click', function() {
-                    const title = this.getAttribute('data-title');
-                    const feedback = parseInt(this.getAttribute('data-feedback'));
-                    const feedbackMessage = document.querySelector('.feedback-message');
-                    
-                    // Remove active class from both buttons
-                    document.querySelectorAll('.feedback-btn').forEach(btn => {
-                        btn.classList.remove('active');
-                    });
-                    
-                    // Add active class to the clicked button
-                    this.classList.add('active');
-                    
-                    // Show feedback message
-                    feedbackMessage.classList.add('active');
-                    setTimeout(() => { feedbackMessage.classList.remove('active'); }, 3000);
-                    
-                    // Send feedback to the server
-                    fetch('/feedback', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            title: title,
-                            feedback: feedback
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('Feedback submitted:', data);
-                    })
-                    .catch(error => {
-                        console.error('Error submitting feedback:', error);
-                    });
-                });
-            });
             
             // Toast function
             function showToast(message) {
@@ -528,6 +645,16 @@
                     toast.classList.remove('active');
                 }, 3000);
             }
+            
+            // Add smooth scrolling
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    document.querySelector(this.getAttribute('href')).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                });
+            });
         });
     </script>
 </body>

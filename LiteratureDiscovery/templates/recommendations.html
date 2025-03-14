@@ -52,6 +52,10 @@
             background-color: var(--danger-color);
         }
         
+        .recommendation-card.news:before {
+            background-color: var(--warning-color);
+        }
+        
         .recommendation-card .title {
             font-weight: 600;
             font-size: 1.4rem;
@@ -270,6 +274,109 @@
             color: var(--accent-hover);
             text-decoration: underline;
         }
+        
+        .action-buttons {
+            margin-top: 1rem;
+        }
+        
+        .action-btn {
+            background-color: var(--accent-color);
+            color: var(--primary-bg);
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color var(--transition-speed);
+        }
+        
+        .action-btn:hover {
+            background-color: var(--accent-hover);
+        }
+        
+        .save-book-btn {
+            margin-right: 1rem;
+        }
+        
+        .cache-info {
+            margin-top: 1rem;
+        }
+        
+        .badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .badge.success {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: var(--success-color);
+        }
+        
+        .category-header {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .category-header i {
+            color: var(--accent-color);
+        }
+        
+        .category-badge {
+            font-size: 0.8rem;
+            background-color: var(--secondary-bg);
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            color: var(--text-muted);
+        }
+        
+        .news-card {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: 0 4px 10px var(--shadow-color);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            border-left: 4px solid var(--warning-color);
+        }
+        
+        .news-card .title {
+            font-weight: 600;
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+        }
+        
+        .news-card .meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        
+        .news-card .summary {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+        
+        .news-type {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background-color: rgba(255, 152, 0, 0.2);
+            color: var(--warning-color);
+        }
     </style>
 </head>
 <body>
@@ -281,7 +388,7 @@
             </a>
             <nav>
                 <ul>
-                    <li><a href="/book/my_books"><i class="fas fa-bookmark"></i> My Books</a></li>
+                    <li><a href="/my_books"><i class="fas fa-bookmark"></i> My Books</a></li>
                 </ul>
             </nav>
         </header>
@@ -297,18 +404,25 @@
         
         <div class="recommendations-grid">
             <div class="recommendations-main">
-                <h2>Your Personalized Recommendations</h2>
-                <p>Based on your interest in "{{ recommendations.input }}"</p>
+                <div class="page-header">
+                    <h2>Personalized Literature Recommendations</h2>
+                    <p class="subtitle">Based on your interest in: <strong>{{ recommendations.input }}</strong></p>
+                    {% if cached %}
+                    <div class="cache-info">
+                        <span class="badge success"><i class="fas fa-bolt"></i> Results loaded from cache ({{ "%.2f"|format(processing_time) }}s)</span>
+                    </div>
+                    {% endif %}
+                </div>
                 
                 {% if recommendations.core %}
                     <h3>Recommended Books For You</h3>
                     {% for item, score, terms in recommendations.core %}
-                        <div class="recommendation-card">
+                        <div class="recommendation-card" onclick="window.location.href='/book/{{ item.goodreads_id }}'" style="cursor: pointer;">
                             <div class="recommendation-content">
                                 {% if item.image_url %}
-                                    <img src="{{ item.image_url }}" alt="{{ item.title }}" class="book-cover-img">
+                                    <img src="{{ item.image_url }}" alt="{{ item.title }}" class="book-cover-img" onerror="this.src='/static/images/placeholder-cover.svg';">
                                 {% else %}
-                                    <img src="{{ url_for('static', filename='images/placeholder-cover.jpg') }}" alt="{{ item.title }}" class="book-cover-img">
+                                    <img src="{{ url_for('static', filename='images/placeholder-cover.svg') }}" alt="{{ item.title }}" class="book-cover-img">
                                 {% endif %}
                                 
                                 <div class="recommendation-details">
@@ -350,79 +464,438 @@
                                         </div>
                                     {% endif %}
                                     
-                                    {% if item.goodreads_id %}
+                                    {% if item.has_valid_goodreads_id %}
                                         <a href="https://www.goodreads.com/book/show/{{ item.goodreads_id }}" target="_blank" class="btn-link">
                                             <i class="fas fa-external-link-alt"></i> View on Goodreads
                                         </a>
                                     {% endif %}
+                                    
+                                    <div class="action-buttons">
+                                        <button class="action-btn save-book-btn" 
+                                            data-goodreads-id="{{ item.goodreads_id }}"
+                                            data-title="{{ item.title }}"
+                                            data-author="{{ item.author }}"
+                                            data-image-url="{{ item.image_url|default('') }}"
+                                            onclick="event.stopPropagation(); saveBookFromButton(this)">
+                                            <i class="fas fa-bookmark"></i> Save to My Books
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     {% endfor %}
                 {% endif %}
                 
-                {% if recommendations.trending %}
-                    <h3>Trending Now</h3>
-                    {% for item, score, terms in recommendations.trending %}
-                        <div class="recommendation-card trending">
-                            <div class="recommendation-content">
-                                {% if item.image_url %}
-                                    <img src="{{ item.image_url }}" alt="{{ item.title }}" class="book-cover-img">
-                                {% else %}
-                                    <img src="{{ url_for('static', filename='images/placeholder-cover.jpg') }}" alt="{{ item.title }}" class="book-cover-img">
+                {% if recommendations.news_and_social %}
+                    <div class="category-header">
+                        <i class="fas fa-newspaper"></i>
+                        <h3>News & Social Updates</h3>
+                        <span class="category-badge">{{ recommendations.news_and_social|length }} items</span>
+                    </div>
+                    
+                    {% for update in recommendations.news_and_social %}
+                        <div class="news-card">
+                            <h3 class="title">{{ update.title }}</h3>
+                            <div class="meta">
+                                <span>{{ update.source }}</span>
+                                {% if update.date %}
+                                    <span>{{ update.date }}</span>
                                 {% endif %}
-                                
-                                <div class="recommendation-details">
-                                    <h3 class="title">{{ item.title }}</h3>
-                                    <div class="meta">
-                                        <span class="author">{{ item.author }}</span>
-                                        {% if item.publication_date %}
-                                            <span>{{ item.publication_date }}</span>
-                                        {% endif %}
-                                        {% if item.genre %}
-                                            <span>{{ item.genre }}</span>
-                                        {% endif %}
-                                    </div>
+                                <span class="news-type">{{ update.type|capitalize }}</span>
+                            </div>
+                            
+                            <div class="summary">
+                                {{ update.summary }}
+                            </div>
+                            
+                            {% if update.url %}
+                                <a href="{{ update.url }}" target="_blank" class="btn-link">
+                                    <i class="fas fa-external-link-alt"></i> Read More
+                                </a>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
+                {% if recommendations.segmented_recommendations %}
+                    <!-- Segmented recommendations will be shown below, so we don't show trending here -->
+                {% else %}
+                    {% if recommendations.trending %}
+                        <h3>Trending Now</h3>
+                        {% for item, score, terms in recommendations.trending %}
+                            <div class="recommendation-card trending" onclick="window.location.href='/book/{{ item.goodreads_id }}'" style="cursor: pointer;">
+                                <div class="recommendation-content">
+                                    {% if item.image_url %}
+                                        <img src="{{ item.image_url }}" alt="{{ item.title }}" class="book-cover-img" onerror="this.src='/static/images/placeholder-cover.svg';">
+                                    {% else %}
+                                        <img src="{{ url_for('static', filename='images/placeholder-cover.svg') }}" alt="{{ item.title }}" class="book-cover-img">
+                                    {% endif %}
                                     
-                                    <div class="match-score {% if score > 0.75 %}score-high{% elif score > 0.5 %}score-medium{% else %}score-low{% endif %}">
-                                        Match: {{ (score * 100)|int }}%
-                                    </div>
-                                    
-                                    <div class="summary-container">
-                                        <button class="summary-toggle" onclick="toggleSummary(this)">
-                                            <i class="fas fa-chevron-down"></i> Show Summary
-                                        </button>
-                                        <div class="summary-content" style="display: none;">
-                                            {% if item.summary %}
-                                                {{ item.summary }}
-                                            {% elif item.description %}
-                                                {{ item.description }}
-                                            {% else %}
-                                                No summary available.
+                                    <div class="recommendation-details">
+                                        <h3 class="title">{{ item.title }}</h3>
+                                        <div class="meta">
+                                            <span class="author">{{ item.author }}</span>
+                                            {% if item.publication_date %}
+                                                <span>{{ item.publication_date }}</span>
+                                            {% endif %}
+                                            {% if item.genre %}
+                                                <span>{{ item.genre }}</span>
                                             {% endif %}
                                         </div>
-                                    </div>
-                                    
-                                    {% if terms %}
-                                        <div class="term-cloud">
-                                            {% for term in terms[:5] %}
-                                                <span class="term-tag">{{ term }}</span>
-                                            {% endfor %}
+                                        
+                                        <div class="match-score {% if score > 0.75 %}score-high{% elif score > 0.5 %}score-medium{% else %}score-low{% endif %}">
+                                            Match: {{ (score * 100)|int }}%
                                         </div>
-                                    {% endif %}
-                                    
-                                    {% if item.goodreads_id %}
-                                        <a href="https://www.goodreads.com/book/show/{{ item.goodreads_id }}" target="_blank" class="btn-link">
-                                            <i class="fas fa-external-link-alt"></i> View on Goodreads
-                                        </a>
-                                    {% endif %}
+                                        
+                                        <div class="summary-container">
+                                            <button class="summary-toggle" onclick="toggleSummary(this)">
+                                                <i class="fas fa-chevron-down"></i> Show Summary
+                                            </button>
+                                            <div class="summary-content" style="display: none;">
+                                                {% if item.summary %}
+                                                    {{ item.summary }}
+                                                {% elif item.description %}
+                                                    {{ item.description }}
+                                                {% else %}
+                                                    No summary available.
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        
+                                        {% if terms %}
+                                            <div class="term-cloud">
+                                                {% for term in terms[:5] %}
+                                                    <span class="term-tag">{{ term }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        
+                                        {% if item.has_valid_goodreads_id %}
+                                            <a href="https://www.goodreads.com/book/show/{{ item.goodreads_id }}" target="_blank" class="btn-link">
+                                                <i class="fas fa-external-link-alt"></i> View on Goodreads
+                                            </a>
+                                        {% endif %}
+                                        
+                                        <div class="action-buttons">
+                                            <button class="action-btn save-book-btn" 
+                                                data-goodreads-id="{{ item.goodreads_id }}"
+                                                data-title="{{ item.title }}"
+                                                data-author="{{ item.author }}"
+                                                data-image-url="{{ item.image_url|default('') }}"
+                                                onclick="event.stopPropagation(); saveBookFromButton(this)">
+                                                <i class="fas fa-bookmark"></i> Save to My Books
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    {% endfor %}
+                        {% endfor %}
+                    {% endif %}
                 {% endif %}
                 
-                {% if not recommendations.core and not recommendations.trending %}
+                {% if recommendations.segmented_recommendations %}
+                    <!-- Novels Section -->
+                    {% if recommendations.segmented_recommendations.novels %}
+                        <div class="category-header">
+                            <i class="fas fa-book"></i>
+                            <h3>Novels</h3>
+                            <span class="category-badge">{{ recommendations.segmented_recommendations.novels|length }} items</span>
+                        </div>
+                        
+                        {% for item, score, terms in recommendations.segmented_recommendations.novels[:5] %}
+                            <div class="recommendation-card" onclick="window.location.href='/book/{{ item.goodreads_id }}'" style="cursor: pointer;">
+                                <div class="recommendation-content">
+                                    {% if item.image_url %}
+                                        <img src="{{ item.image_url }}" alt="{{ item.title }}" class="book-cover-img" onerror="this.src='/static/images/placeholder-cover.svg';">
+                                    {% else %}
+                                        <img src="{{ url_for('static', filename='images/placeholder-cover.svg') }}" alt="{{ item.title }}" class="book-cover-img">
+                                    {% endif %}
+                                    
+                                    <div class="recommendation-details">
+                                        <h3 class="title">{{ item.title }}</h3>
+                                        <div class="meta">
+                                            <span class="author">{{ item.author }}</span>
+                                            {% if item.publication_date %}
+                                                <span>{{ item.publication_date }}</span>
+                                            {% endif %}
+                                            {% if item.genre %}
+                                                <span>{{ item.genre }}</span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <div class="match-score {% if score > 0.75 %}score-high{% elif score > 0.5 %}score-medium{% else %}score-low{% endif %}">
+                                            Match: {{ (score * 100)|int }}%
+                                        </div>
+                                        
+                                        <div class="summary-container">
+                                            <button class="summary-toggle" onclick="toggleSummary(this)">
+                                                <i class="fas fa-chevron-down"></i> Show Summary
+                                            </button>
+                                            <div class="summary-content" style="display: none;">
+                                                {% if item.summary %}
+                                                    {{ item.summary }}
+                                                {% elif item.description %}
+                                                    {{ item.description }}
+                                                {% else %}
+                                                    No summary available.
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        
+                                        {% if terms %}
+                                            <div class="term-cloud">
+                                                {% for term in terms[:5] %}
+                                                    <span class="term-tag">{{ term }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        
+                                        {% if item.has_valid_goodreads_id %}
+                                            <a href="https://www.goodreads.com/book/show/{{ item.goodreads_id }}" target="_blank" class="btn-link">
+                                                <i class="fas fa-external-link-alt"></i> View on Goodreads
+                                            </a>
+                                        {% endif %}
+                                        
+                                        <div class="action-buttons">
+                                            <button class="action-btn save-book-btn" 
+                                                data-goodreads-id="{{ item.goodreads_id }}"
+                                                data-title="{{ item.title }}"
+                                                data-author="{{ item.author }}"
+                                                data-image-url="{{ item.image_url|default('') }}"
+                                                onclick="event.stopPropagation(); saveBookFromButton(this)">
+                                                <i class="fas fa-bookmark"></i> Save to My Books
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <!-- Papers Section -->
+                    {% if recommendations.segmented_recommendations.papers %}
+                        <div class="category-header">
+                            <i class="fas fa-file-alt"></i>
+                            <h3>Papers</h3>
+                            <span class="category-badge">{{ recommendations.segmented_recommendations.papers|length }} items</span>
+                        </div>
+                        
+                        {% for item, score, terms in recommendations.segmented_recommendations.papers[:5] %}
+                            <div class="recommendation-card" onclick="window.location.href='/book/{{ item.goodreads_id }}'" style="cursor: pointer;">
+                                <!-- Same card structure as novels -->
+                                <div class="recommendation-content">
+                                    {% if item.image_url %}
+                                        <img src="{{ item.image_url }}" alt="{{ item.title }}" class="book-cover-img" onerror="this.src='/static/images/placeholder-cover.svg';">
+                                    {% else %}
+                                        <img src="{{ url_for('static', filename='images/placeholder-cover.svg') }}" alt="{{ item.title }}" class="book-cover-img">
+                                    {% endif %}
+                                    
+                                    <div class="recommendation-details">
+                                        <h3 class="title">{{ item.title }}</h3>
+                                        <div class="meta">
+                                            <span class="author">{{ item.author }}</span>
+                                            {% if item.publication_date %}
+                                                <span>{{ item.publication_date }}</span>
+                                            {% endif %}
+                                            {% if item.genre %}
+                                                <span>{{ item.genre }}</span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <div class="match-score {% if score > 0.75 %}score-high{% elif score > 0.5 %}score-medium{% else %}score-low{% endif %}">
+                                            Match: {{ (score * 100)|int }}%
+                                        </div>
+                                        
+                                        <div class="summary-container">
+                                            <button class="summary-toggle" onclick="toggleSummary(this)">
+                                                <i class="fas fa-chevron-down"></i> Show Summary
+                                            </button>
+                                            <div class="summary-content" style="display: none;">
+                                                {% if item.summary %}
+                                                    {{ item.summary }}
+                                                {% elif item.description %}
+                                                    {{ item.description }}
+                                                {% else %}
+                                                    No summary available.
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        
+                                        {% if terms %}
+                                            <div class="term-cloud">
+                                                {% for term in terms[:5] %}
+                                                    <span class="term-tag">{{ term }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <div class="action-buttons">
+                                            <button class="action-btn save-book-btn" 
+                                                data-goodreads-id="{{ item.goodreads_id }}"
+                                                data-title="{{ item.title }}"
+                                                data-author="{{ item.author }}"
+                                                data-image-url="{{ item.image_url|default('') }}"
+                                                onclick="event.stopPropagation(); saveBookFromButton(this)">
+                                                <i class="fas fa-bookmark"></i> Save to My Books
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <!-- Poems Section -->
+                    {% if recommendations.segmented_recommendations.poems %}
+                        <div class="category-header">
+                            <i class="fas fa-feather-alt"></i>
+                            <h3>Poems</h3>
+                            <span class="category-badge">{{ recommendations.segmented_recommendations.poems|length }} items</span>
+                        </div>
+                        
+                        {% for item, score, terms in recommendations.segmented_recommendations.poems[:5] %}
+                            <div class="recommendation-card" onclick="window.location.href='/book/{{ item.goodreads_id }}'" style="cursor: pointer;">
+                                <!-- Same card structure as novels -->
+                                <div class="recommendation-content">
+                                    {% if item.image_url %}
+                                        <img src="{{ item.image_url }}" alt="{{ item.title }}" class="book-cover-img" onerror="this.src='/static/images/placeholder-cover.svg';">
+                                    {% else %}
+                                        <img src="{{ url_for('static', filename='images/placeholder-cover.svg') }}" alt="{{ item.title }}" class="book-cover-img">
+                                    {% endif %}
+                                    
+                                    <div class="recommendation-details">
+                                        <h3 class="title">{{ item.title }}</h3>
+                                        <div class="meta">
+                                            <span class="author">{{ item.author }}</span>
+                                            {% if item.publication_date %}
+                                                <span>{{ item.publication_date }}</span>
+                                            {% endif %}
+                                            {% if item.genre %}
+                                                <span>{{ item.genre }}</span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <div class="match-score {% if score > 0.75 %}score-high{% elif score > 0.5 %}score-medium{% else %}score-low{% endif %}">
+                                            Match: {{ (score * 100)|int }}%
+                                        </div>
+                                        
+                                        <div class="summary-container">
+                                            <button class="summary-toggle" onclick="toggleSummary(this)">
+                                                <i class="fas fa-chevron-down"></i> Show Summary
+                                            </button>
+                                            <div class="summary-content" style="display: none;">
+                                                {% if item.summary %}
+                                                    {{ item.summary }}
+                                                {% elif item.description %}
+                                                    {{ item.description }}
+                                                {% else %}
+                                                    No summary available.
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        
+                                        {% if terms %}
+                                            <div class="term-cloud">
+                                                {% for term in terms[:5] %}
+                                                    <span class="term-tag">{{ term }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <div class="action-buttons">
+                                            <button class="action-btn save-book-btn" 
+                                                data-goodreads-id="{{ item.goodreads_id }}"
+                                                data-title="{{ item.title }}"
+                                                data-author="{{ item.author }}"
+                                                data-image-url="{{ item.image_url|default('') }}"
+                                                onclick="event.stopPropagation(); saveBookFromButton(this)">
+                                                <i class="fas fa-bookmark"></i> Save to My Books
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <!-- Other Section -->
+                    {% if recommendations.segmented_recommendations.other %}
+                        <div class="category-header">
+                            <i class="fas fa-bookmark"></i>
+                            <h3>Other Literature</h3>
+                            <span class="category-badge">{{ recommendations.segmented_recommendations.other|length }} items</span>
+                        </div>
+                        
+                        {% for item, score, terms in recommendations.segmented_recommendations.other[:5] %}
+                            <div class="recommendation-card" onclick="window.location.href='/book/{{ item.goodreads_id }}'" style="cursor: pointer;">
+                                <!-- Same card structure as novels -->
+                                <div class="recommendation-content">
+                                    {% if item.image_url %}
+                                        <img src="{{ item.image_url }}" alt="{{ item.title }}" class="book-cover-img" onerror="this.src='/static/images/placeholder-cover.svg';">
+                                    {% else %}
+                                        <img src="{{ url_for('static', filename='images/placeholder-cover.svg') }}" alt="{{ item.title }}" class="book-cover-img">
+                                    {% endif %}
+                                    
+                                    <div class="recommendation-details">
+                                        <h3 class="title">{{ item.title }}</h3>
+                                        <div class="meta">
+                                            <span class="author">{{ item.author }}</span>
+                                            {% if item.publication_date %}
+                                                <span>{{ item.publication_date }}</span>
+                                            {% endif %}
+                                            {% if item.genre %}
+                                                <span>{{ item.genre }}</span>
+                                            {% endif %}
+                                            {% if item.item_type %}
+                                                <span>{{ item.item_type|capitalize }}</span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <div class="match-score {% if score > 0.75 %}score-high{% elif score > 0.5 %}score-medium{% else %}score-low{% endif %}">
+                                            Match: {{ (score * 100)|int }}%
+                                        </div>
+                                        
+                                        <div class="summary-container">
+                                            <button class="summary-toggle" onclick="toggleSummary(this)">
+                                                <i class="fas fa-chevron-down"></i> Show Summary
+                                            </button>
+                                            <div class="summary-content" style="display: none;">
+                                                {% if item.summary %}
+                                                    {{ item.summary }}
+                                                {% elif item.description %}
+                                                    {{ item.description }}
+                                                {% else %}
+                                                    No summary available.
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        
+                                        {% if terms %}
+                                            <div class="term-cloud">
+                                                {% for term in terms[:5] %}
+                                                    <span class="term-tag">{{ term }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <div class="action-buttons">
+                                            <button class="action-btn save-book-btn" 
+                                                data-goodreads-id="{{ item.goodreads_id }}"
+                                                data-title="{{ item.title }}"
+                                                data-author="{{ item.author }}"
+                                                data-image-url="{{ item.image_url|default('') }}"
+                                                onclick="event.stopPropagation(); saveBookFromButton(this)">
+                                                <i class="fas fa-bookmark"></i> Save to My Books
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endif %}
+                
+                {% if not recommendations.core and not recommendations.trending and not recommendations.segmented_recommendations %}
                     <div class="card">
                         <p>No recommendations found for your input. Try a different book, author, or theme.</p>
                     </div>
@@ -480,6 +953,38 @@
                 summaryContent.style.display = 'none';
                 button.innerHTML = '<i class="fas fa-chevron-down"></i> Show Summary';
             }
+        }
+        
+        function saveBookFromButton(button) {
+            const goodreadsId = button.getAttribute('data-goodreads-id');
+            const title = button.getAttribute('data-title');
+            const author = button.getAttribute('data-author');
+            const imageUrl = button.getAttribute('data-image-url');
+            
+            fetch('/save_book', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    goodreads_id: goodreadsId,
+                    title: title,
+                    author: author,
+                    image_url: imageUrl
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Book saved to My Books!');
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error saving book:', error);
+                alert('An error occurred while saving the book.');
+            });
         }
     </script>
 </body>

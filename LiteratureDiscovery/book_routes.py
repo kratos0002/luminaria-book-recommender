@@ -4,7 +4,7 @@ This module contains Flask routes for book details and reading list functionalit
 """
 
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, session, flash
-from book_details import get_book_details, save_to_reading_list, is_in_reading_list, recs_cache
+from LiteratureDiscovery.book_details import get_book_details, save_to_reading_list, is_in_reading_list, recs_cache, get_reading_list
 
 # Create a Blueprint for book routes
 book_bp = Blueprint('book', __name__)
@@ -16,6 +16,8 @@ def book_details():
     """
     # Get the book title from the query parameter
     title = request.args.get('title')
+    goodreads_id = request.args.get('goodreads_id', '')
+    
     if not title:
         flash("No book title provided")
         return redirect(url_for('get_recommendations_route'))
@@ -29,6 +31,13 @@ def book_details():
         flash(f"Could not retrieve details for '{title}'")
         return redirect(url_for('get_recommendations_route'))
     
+    # Add Goodreads ID to book info if provided
+    if goodreads_id and 'goodreads_id' not in book_info:
+        book_info['goodreads_id'] = goodreads_id
+    
+    # Check if the book is in the reading list
+    book_info['is_saved'] = is_in_reading_list(session_id, title, goodreads_id)
+    
     # Render the book details template
     return render_template('book.html', book=book_info)
 
@@ -37,12 +46,14 @@ def save_book():
     """
     Route for saving a book to the user's reading list.
     """
-    # Get the book title from the request
+    # Get the book title and Goodreads ID from the request
     if request.is_json:
         data = request.get_json()
         title = data.get('title')
+        goodreads_id = data.get('goodreads_id', '')
     else:
         title = request.form.get('title')
+        goodreads_id = request.form.get('goodreads_id', '')
     
     if not title:
         return jsonify({"success": False, "error": "No book title provided"}), 400
@@ -53,7 +64,7 @@ def save_book():
         return jsonify({"success": False, "error": "No session ID found"}), 400
     
     # Save the book to the reading list
-    success = save_to_reading_list(session_id, title)
+    success = save_to_reading_list(session_id, title, goodreads_id)
     
     return jsonify({"success": success})
 
@@ -84,6 +95,24 @@ def book_feedback():
     print(f"Received feedback for '{title}': {feedback} from session {session_id}")
     
     return jsonify({"success": True})
+
+@book_bp.route('/my_books', methods=['GET'])
+def my_books():
+    """
+    Route for displaying the user's reading list.
+    """
+    # Get the session ID from the cookie
+    session_id = request.cookies.get('session_id')
+    
+    if not session_id:
+        flash("Please browse some books first to create a session")
+        return redirect(url_for('index'))
+    
+    # Get the user's reading list
+    books = get_reading_list(session_id)
+    
+    # Render the my_books template
+    return render_template('my_books.html', books=books)
 
 # Function to register the blueprint with the Flask app
 def register_book_routes(app):

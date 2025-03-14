@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ book.title }} - Luminaria</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='dark-theme.css') }}">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Book details specific styles */
+        .book-details-container {
+            display: grid;
+            grid-template-columns: 1fr 3fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        @media (max-width: 768px) {
+            .book-details-container {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .book-cover-container {
+            text-align: center;
+        }
+        
+        .book-cover {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px var(--shadow-color);
+        }
+        
+        .book-info h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+        }
+        
+        .book-author {
+            font-size: 1.2rem;
+            color: var(--accent-color);
+            margin-bottom: 1rem;
+        }
+        
+        .book-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        
+        .book-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .book-description {
+            line-height: 1.7;
+            margin-bottom: 2rem;
+            color: var(--text-color);
+        }
+        
+        .book-themes {
+            margin-bottom: 2rem;
+        }
+        
+        .book-themes h3 {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: var(--accent-color);
+        }
+        
+        .similar-books {
+            margin-top: 2rem;
+        }
+        
+        .similar-books h3 {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: var(--accent-color);
+        }
+        
+        .similar-book-card {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 5px var(--shadow-color);
+        }
+        
+        .similar-book-title {
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+        
+        .similar-book-author {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+        
+        .similar-book-reason {
+            font-size: 0.9rem;
+            color: var(--text-color);
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.8rem 1.5rem;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color var(--transition-speed);
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: var(--primary-bg);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary-bg);
+            color: var(--text-color);
+        }
+        
+        .btn-secondary:hover {
+            background-color: var(--border-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="logo">
+                <i class="fas fa-book-open"></i>
+                <span>Luminaria</span>
+            </a>
+            <nav>
+                <a href="/" class="nav-link">
+                    <i class="fas fa-home"></i>
+                    <span>Home</span>
+                </a>
+                <a href="/reading-list" class="nav-link">
+                    <i class="fas fa-list"></i>
+                    <span>Reading List</span>
+                </a>
+            </nav>
+        </header>
+        
+        <div class="book-details-container">
+            <div class="book-cover-container">
+                <img src="{{ book.image_url }}" alt="{{ book.title }}" class="book-cover" onerror="this.onerror = null; this.src = '{{ url_for('static', filename='images/placeholder-cover.svg') }}';">
+                
+                <div class="action-buttons">
+                    {% if book.has_valid_goodreads_id %}
+                    <a href="https://www.goodreads.com/book/show/{{ book.goodreads_id }}" target="_blank" class="btn btn-primary">
+                        <i class="fas fa-external-link-alt"></i> View on Goodreads
+                    </a>
+                    {% endif %}
+                    <a href="#" class="btn btn-secondary add-to-reading-list" data-goodreads-id="{{ book.goodreads_id }}" data-title="{{ book.title }}">
+                        <i class="fas fa-bookmark"></i> Add to Reading List
+                    </a>
+                </div>
+            </div>
+            
+            <div class="book-info">
+                <h1>{{ book.title }}</h1>
+                <div class="book-author">by {{ book.author }}</div>
+                
+                <div class="book-meta">
+                    {% if book.publication_date %}
+                    <div class="book-meta-item">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>{{ book.publication_date }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    {% if book.genre %}
+                    <div class="book-meta-item">
+                        <i class="fas fa-tag"></i>
+                        <span>{{ book.genre }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="book-description">
+                    {{ book.description|safe }}
+                </div>
+                
+                {% if book.themes %}
+                <div class="book-themes">
+                    <h3>Themes</h3>
+                    <div class="term-cloud">
+                        {% for theme in book.themes %}
+                        <span class="term-tag">{{ theme }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if book.similar_books %}
+                <div class="similar-books">
+                    <h3>Similar Books You Might Enjoy</h3>
+                    {% for similar in book.similar_books %}
+                    <div class="similar-book-card">
+                        <div class="similar-book-title">{{ similar.title }}</div>
+                        <div class="similar-book-author">by {{ similar.author }}</div>
+                        <div class="similar-book-reason">{{ similar.reason }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <footer>
+            <p>Powered by Luminaria &copy; 2025</p>
+        </footer>
+    </div>
+    
+    <script>
+        // Add to reading list functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const addToReadingListBtn = document.querySelector('.add-to-reading-list');
+            
+            if (addToReadingListBtn) {
+                addToReadingListBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const goodreadsId = this.getAttribute('data-goodreads-id');
+                    const title = this.getAttribute('data-title');
+                    
+                    // Send request to add to reading list
+                    fetch('/reading-list/add', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            goodreads_id: goodreadsId,
+                            title: title
+                        }),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Book added to your reading list!');
+                        } else {
+                            alert('Error: ' + data.error);
+                        }
+                    })
+                    .catch((error) => {
+                        console.error('Error:', error);
+                        alert('An error occurred. Please try again.');
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

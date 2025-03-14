@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Books | Luminaria</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='dark-theme.css') }}">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* My Books Page Specific Styles */
+        .profile-section {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            margin-bottom: 2rem;
+            padding: 2rem;
+            background-color: var(--secondary-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background-color: var(--accent-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        
+        .profile-info {
+            flex: 1;
+        }
+        
+        .profile-name {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 0 0 0.5rem 0;
+        }
+        
+        .profile-stats {
+            display: flex;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+        
+        .stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        /* Reading List Section */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .section-title i {
+            color: var(--accent-color);
+        }
+        
+        .filter-dropdown {
+            position: relative;
+        }
+        
+        .filter-button {
+            background-color: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        /* Dropdown menu */
+        .filter-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            width: 220px;
+            background-color: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 1rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 5;
+            display: none;
+        }
+        
+        .filter-button.active .filter-menu {
+            display: block;
+        }
+        
+        .filter-menu h4 {
+            margin: 0.5rem 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .filter-item {
+            display: block;
+            padding: 0.5rem;
+            border-radius: 4px;
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        
+        .filter-item:hover {
+            background-color: var(--hover-color);
+        }
+        
+        .filter-item.active {
+            background-color: var(--hover-color);
+            font-weight: 500;
+        }
+        
+        /* Book Grid */
+        .books-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .book-card {
+            background-color: var(--secondary-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
+            position: relative;
+        }
+        
+        .book-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .book-cover {
+            height: 250px;
+            background-color: var(--primary-bg);
+            position: relative;
+        }
+        
+        .book-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .book-info {
+            padding: 1.5rem;
+        }
+        
+        .book-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 0 0 0.5rem 0;
+        }
+        
+        .book-author {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        
+        .book-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+        }
+        
+        .btn-remove {
+            background-color: rgba(244, 67, 54, 0.1);
+            color: #F44336;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-remove:hover {
+            background-color: rgba(244, 67, 54, 0.2);
+        }
+        
+        .reading-status {
+            font-size: 0.9rem;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        
+        .status-reading {
+            background-color: rgba(33, 150, 243, 0.1);
+            color: #2196F3;
+        }
+        
+        .status-completed {
+            background-color: rgba(76, 175, 80, 0.1);
+            color: #4CAF50;
+        }
+        
+        .status-want {
+            background-color: rgba(255, 152, 0, 0.1);
+            color: #FF9800;
+        }
+        
+        /* Book dropdown */
+        .book-dropdown {
+            position: relative;
+        }
+        
+        .book-dropdown-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        
+        .book-dropdown-btn:hover {
+            background-color: var(--hover-color);
+        }
+        
+        .book-dropdown-btn.active {
+            background-color: var(--hover-color);
+        }
+        
+        .book-dropdown-content {
+            position: absolute;
+            right: 0;
+            top: 100%;
+            width: 220px;
+            background-color: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 5;
+            display: none;
+        }
+        
+        .book-dropdown-btn.active + .book-dropdown-content {
+            display: block;
+        }
+        
+        .dropdown-section {
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .dropdown-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        
+        .dropdown-section-title {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .book-dropdown-content a {
+            display: block;
+            padding: 0.5rem;
+            border-radius: 4px;
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+        }
+        
+        .book-dropdown-content a:hover {
+            background-color: var(--hover-color);
+        }
+        
+        /* Progress bar */
+        .progress-container {
+            margin-top: 1rem;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background-color: var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+        
+        .progress {
+            height: 100%;
+            background-color: var(--accent-color);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        
+        .progress-text {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        
+        .progress-slider {
+            width: 100%;
+            margin: 0;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 4px;
+            background: var(--border-color);
+            outline: none;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+            border-radius: 2px;
+        }
+        
+        .progress-slider:hover {
+            opacity: 1;
+        }
+        
+        .progress-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+        }
+        
+        .progress-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            background-color: var(--secondary-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            color: var(--border-color);
+            margin-bottom: 1rem;
+        }
+        
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .empty-state p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+        
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-2px);
+        }
+        
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--accent-color);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+        
+        .toast.active {
+            opacity: 1;
+        }
+        
+        /* Animation */
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+            opacity: 0;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="logo">
+                <i class="fas fa-book-open"></i>
+                <span>Luminaria</span>
+            </a>
+            <nav>
+                <ul>
+                    <li><a href="/my_books" class="active"><i class="fas fa-bookmark"></i> My Books</a></li>
+                    <li><a href="/"><i class="fas fa-search"></i> New Search</a></li>
+                </ul>
+            </nav>
+        </header>
+        
+        <main class="animate-fade-in">
+            <!-- Profile Section -->
+            <section class="profile-section">
+                <div class="profile-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="profile-info">
+                    <h1 class="profile-name">{{ username if username else 'Reader' }}</h1>
+                    <p>Book enthusiast and avid reader</p>
+                    
+                    <div class="profile-stats">
+                        <div class="stat">
+                            <span class="stat-value">{{ books|length if books else 0 }}</span>
+                            <span class="stat-label">Books Saved</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">{{ books|selectattr('status', 'equalto', 'completed')|list|length if books else 0 }}</span>
+                            <span class="stat-label">Completed</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">{{ books|selectattr('status', 'equalto', 'reading')|list|length if books else 0 }}</span>
+                            <span class="stat-label">Currently Reading</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Reading List Section -->
+            <section>
+                <div class="section-header">
+                    <h2 class="section-title"><i class="fas fa-book-reader"></i> My Books</h2>
+                    <div class="filter-dropdown">
+                        <button class="filter-button">
+                            <i class="fas fa-filter"></i> Filter
+                            <div class="filter-menu">
+                                <h4>Status</h4>
+                                <a href="/my_books{% if current_shelf %}?shelf={{ current_shelf }}{% endif %}" class="filter-item {% if not current_status %}active{% endif %}">All</a>
+                                <a href="/my_books?status=to_read{% if current_shelf %}&shelf={{ current_shelf }}{% endif %}" class="filter-item {% if current_status == 'to_read' %}active{% endif %}">Want to Read</a>
+                                <a href="/my_books?status=reading{% if current_shelf %}&shelf={{ current_shelf }}{% endif %}" class="filter-item {% if current_status == 'reading' %}active{% endif %}">Currently Reading</a>
+                                <a href="/my_books?status=completed{% if current_shelf %}&shelf={{ current_shelf }}{% endif %}" class="filter-item {% if current_status == 'completed' %}active{% endif %}">Completed</a>
+                                
+                                <h4>Bookshelves</h4>
+                                <a href="/my_books{% if current_status %}?status={{ current_status }}{% endif %}" class="filter-item {% if not current_shelf %}active{% endif %}">All</a>
+                                {% for shelf in bookshelves %}
+                                <a href="/my_books?shelf={{ shelf }}{% if current_status %}&status={{ current_status }}{% endif %}" class="filter-item {% if current_shelf == shelf %}active{% endif %}">{{ shelf }}</a>
+                                {% endfor %}
+                            </div>
+                        </button>
+                    </div>
+                </div>
+                
+                {% if books and books|length > 0 %}
+                <div class="books-grid">
+                    {% for book in books %}
+                    <div class="book-card" data-id="{{ book.saved_id }}">
+                        <div class="book-cover">
+                            {% if book.image_url %}
+                            <img src="{{ book.image_url }}" alt="{{ book.title }}">
+                            {% else %}
+                            <div class="placeholder-cover" style="height: 100%; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-book fa-3x" style="color: var(--border-color);"></i>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="book-info">
+                            <h3 class="book-title">{{ book.title }}</h3>
+                            <p class="book-author">By {{ book.author }}</p>
+                            
+                            <div class="book-actions">
+                                <span class="reading-status {% if book.status == 'reading' %}status-reading{% elif book.status == 'completed' %}status-completed{% else %}status-want{% endif %}">
+                                    {% if book.status == 'reading' %}
+                                    <i class="fas fa-book-open"></i> Reading
+                                    {% elif book.status == 'completed' %}
+                                    <i class="fas fa-check-circle"></i> Completed
+                                    {% else %}
+                                    <i class="fas fa-bookmark"></i> Want to Read
+                                    {% endif %}
+                                </span>
+                                
+                                <div class="book-dropdown">
+                                    <button class="book-dropdown-btn"><i class="fas fa-ellipsis-v"></i></button>
+                                    <div class="book-dropdown-content">
+                                        <div class="dropdown-section">
+                                            <span class="dropdown-section-title">Status</span>
+                                            <a href="#" class="update-status" data-status="to_read" data-book-id="{{ book.saved_id }}">
+                                                <i class="fas fa-bookmark"></i> Want to Read
+                                            </a>
+                                            <a href="#" class="update-status" data-status="reading" data-book-id="{{ book.saved_id }}">
+                                                <i class="fas fa-book-open"></i> Currently Reading
+                                            </a>
+                                            <a href="#" class="update-status" data-status="completed" data-book-id="{{ book.saved_id }}">
+                                                <i class="fas fa-check-circle"></i> Completed
+                                            </a>
+                                        </div>
+                                        
+                                        <div class="dropdown-section">
+                                            <span class="dropdown-section-title">Bookshelves</span>
+                                            {% if bookshelves %}
+                                                {% for shelf in bookshelves %}
+                                                <a href="#" class="toggle-shelf" data-shelf="{{ shelf }}" data-book-id="{{ book.saved_id }}" data-on-shelf="{{ 'true' if shelf in book.shelves else 'false' }}">
+                                                    <i class="fas {% if shelf in book.shelves %}fa-check-square{% else %}fa-square{% endif %}"></i> {{ shelf }}
+                                                </a>
+                                                {% endfor %}
+                                            {% endif %}
+                                            <a href="#" class="create-shelf-btn" data-book-id="{{ book.saved_id }}">
+                                                <i class="fas fa-plus"></i> Create New Shelf
+                                            </a>
+                                        </div>
+                                        
+                                        <div class="dropdown-section">
+                                            <a href="#" class="remove-book" data-book-id="{{ book.saved_id }}">
+                                                <i class="fas fa-trash"></i> Remove from My Books
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {% if book.status == 'reading' %}
+                            <div class="progress-container">
+                                <div class="progress-bar">
+                                    <div class="progress" style="width: {{ book.progress if book.progress else 0 }}%;"></div>
+                                </div>
+                                <span class="progress-text">{{ book.progress if book.progress else 0 }}% Complete</span>
+                                <input type="range" class="progress-slider" min="0" max="100" value="{{ book.progress if book.progress else 0 }}" data-book-id="{{ book.saved_id }}">
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-book"></i>
+                    <h3>No Books in Your Collection</h3>
+                    <p>Start adding books to your collection from search results</p>
+                    <a href="/" class="btn-primary"><i class="fas fa-search"></i> Search for Books</a>
+                </div>
+                {% endif %}
+            </section>
+            
+            <!-- Recommended Books Section -->
+            {% if recommendations and recommendations|length > 0 %}
+            <section>
+                <div class="section-header">
+                    <h2 class="section-title"><i class="fas fa-lightbulb"></i> Recommended for You</h2>
+                </div>
+                
+                <div class="books-grid">
+                    {% for book in recommendations %}
+                    <div class="book-card">
+                        <div class="book-cover">
+                            {% if book.image_url %}
+                            <img src="{{ book.image_url }}" alt="{{ book.title }}">
+                            {% else %}
+                            <div class="placeholder-cover" style="height: 100%; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-book fa-3x" style="color: var(--border-color);"></i>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="book-info">
+                            <h3 class="book-title">{{ book.title }}</h3>
+                            <p class="book-author">By {{ book.author }}</p>
+                            
+                            <div class="book-actions">
+                                <button class="add-to-books" data-goodreads-id="{{ book.goodreads_id }}" data-title="{{ book.title }}" data-author="{{ book.author }}" data-image-url="{{ book.image_url }}">
+                                    <i class="fas fa-plus"></i> Add to My Books
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+        </main>
+        
+        <footer>
+            <p>Powered by Luminaria &copy; 2025</p>
+        </footer>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+    
+    <script>
+        // Toggle filter dropdown
+        document.querySelector('.filter-button').addEventListener('click', function(e) {
+            e.stopPropagation();
+            this.classList.toggle('active');
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function() {
+            document.querySelector('.filter-button').classList.remove('active');
+            
+            // Close all book dropdowns
+            document.querySelectorAll('.book-dropdown-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+        });
+        
+        // Book dropdown toggle
+        document.querySelectorAll('.book-dropdown-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                
+                // Close all other dropdowns first
+                document.querySelectorAll('.book-dropdown-btn').forEach(otherBtn => {
+                    if (otherBtn !== this) {
+                        otherBtn.classList.remove('active');
+                    }
+                });
+                
+                this.classList.toggle('active');
+            });
+        });
+        
+        // Prevent dropdown content clicks from closing dropdown
+        document.querySelectorAll('.book-dropdown-content').forEach(content => {
+            content.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        });
+        
+        // Update book status
+        document.querySelectorAll('.update-status').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const bookId = this.getAttribute('data-book-id');
+                const status = this.getAttribute('data-status');
+                
+                fetch('/update_book_status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        saved_book_id: bookId,
+                        status: status
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('Book status updated');
+                        // Reload the page to show changes
+                        window.location.reload();
+                    } else {
+                        showToast('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    showToast('Error updating status');
+                    console.error('Error:', error);
+                });
+            });
+        });
+        
+        // Toggle bookshelf
+        document.querySelectorAll('.toggle-shelf').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const bookId = this.getAttribute('data-book-id');
+                const shelf = this.getAttribute('data-shelf');
+                const onShelf = this.getAttribute('data-on-shelf') === 'true';
+                const action = onShelf ? 'remove' : 'add';
+                
+                fetch('/manage_bookshelf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        saved_book_id: bookId,
+                        shelf_name: shelf,
+                        action: action
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast(`Book ${action === 'add' ? 'added to' : 'removed from'} "${shelf}" shelf`);
+                        // Reload the page to show changes
+                        window.location.reload();
+                    } else {
+                        showToast('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    showToast('Error managing bookshelf');
+                    console.error('Error:', error);
+                });
+            });
+        });
+        
+        // Create new shelf
+        document.querySelectorAll('.create-shelf-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const bookId = this.getAttribute('data-book-id');
+                const shelfName = prompt('Enter a name for your new bookshelf:');
+                
+                if (shelfName) {
+                    fetch('/manage_bookshelf', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            saved_book_id: bookId,
+                            shelf_name: shelfName,
+                            action: 'add'
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showToast(`Created "${shelfName}" shelf and added book`);
+                            // Reload the page to show changes
+                            window.location.reload();
+                        } else {
+                            showToast('Error: ' + data.error);
+                        }
+                    })
+                    .catch(error => {
+                        showToast('Error creating shelf');
+                        console.error('Error:', error);
+                    });
+                }
+            });
+        });
+        
+        // Remove book
+        document.querySelectorAll('.remove-book').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (confirm('Are you sure you want to remove this book from your collection?')) {
+                    const bookId = this.getAttribute('data-book-id');
+                    
+                    fetch('/remove_book', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            saved_book_id: bookId
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showToast('Book removed from your collection');
+                            // Reload the page to show changes
+                            window.location.reload();
+                        } else {
+                            showToast('Error: ' + data.error);
+                        }
+                    })
+                    .catch(error => {
+                        showToast('Error removing book');
+                        console.error('Error:', error);
+                    });
+                }
+            });
+        });
+        
+        // Update progress slider
+        document.querySelectorAll('.progress-slider').forEach(slider => {
+            slider.addEventListener('input', function() {
+                const value = this.value;
+                const bookCard = this.closest('.book-card');
+                const progressBar = bookCard.querySelector('.progress');
+                const progressText = bookCard.querySelector('.progress-text');
+                
+                progressBar.style.width = value + '%';
+                progressText.textContent = value + '% Complete';
+            });
+            
+            slider.addEventListener('change', function() {
+                const value = this.value;
+                const bookId = this.getAttribute('data-book-id');
+                
+                fetch('/update_book_status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        saved_book_id: bookId,
+                        progress: parseInt(value)
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('Reading progress updated');
+                    } else {
+                        showToast('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    showToast('Error updating progress');
+                    console.error('Error:', error);
+                });
+            });
+        });
+        
+        // Add to My Books from recommendations
+        document.querySelectorAll('.add-to-books').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const goodreadsId = this.getAttribute('data-goodreads-id');
+                const title = this.getAttribute('data-title');
+                const author = this.getAttribute('data-author');
+                const imageUrl = this.getAttribute('data-image-url');
+                
+                fetch('/save_book', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        goodreads_id: goodreadsId,
+                        title: title,
+                        author: author,
+                        image_url: imageUrl
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('Book added to your collection');
+                        // Reload the page to show changes
+                        window.location.reload();
+                    } else {
+                        showToast('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    showToast('Error adding book');
+                    console.error('Error:', error);
+                });
+            });
+        });
+        
+        // Toast notification function
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('active');
+            
+            setTimeout(() => {
+                toast.classList.remove('active');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

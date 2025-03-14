@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Images</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .image-test {
+            margin-bottom: 30px;
+            border: 1px solid #ccc;
+            padding: 15px;
+        }
+        img {
+            max-width: 200px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image Test Page</h1>
+    
+    <div class="image-test">
+        <h2>Test 1: Direct Placeholder Image</h2>
+        <p>URL: /static/placeholder.jpg</p>
+        <img src="{{ url_for('static', filename='placeholder.jpg') }}" alt="Placeholder">
+    </div>
+    
+    <div class="image-test">
+        <h2>Test 2: Images Directory Placeholder</h2>
+        <p>URL: /static/images/placeholder-cover.jpg</p>
+        <img src="{{ url_for('static', filename='images/placeholder-cover.jpg') }}" alt="Placeholder in Images">
+    </div>
+    
+    <div class="image-test">
+        <h2>Test 3: Book Covers Directory</h2>
+        <p>URL: /static/book_covers/test.jpg (if exists)</p>
+        <img src="{{ url_for('static', filename='book_covers/test.jpg') }}" alt="Test Book Cover">
+    </div>
+    
+    <div class="image-test">
+        <h2>Test 4: Absolute URL Test</h2>
+        <p>URL: https://covers.openlibrary.org/b/id/12345-L.jpg</p>
+        <img src="https://covers.openlibrary.org/b/id/12345-L.jpg" alt="Open Library Test">
+    </div>
+</body>
+</html>

@@ -16,7 +16,9 @@ from cachetools import TTLCache
 from dotenv import load_dotenv
 
 # Import from literature_logic
-from literature_logic import LiteratureItem, init_db, logger
+from LiteratureDiscovery.literature_logic import (
+    LiteratureItem, init_db, logger, get_book_cover
+)
 
 # Load environment variables
 load_dotenv()
@@ -40,7 +42,8 @@ def extend_db_schema():
     """
     try:
         # Connect to the database
-        conn = sqlite3.connect("user_history.db")
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_history.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         # Create the user_reading_list table if it doesn't exist
@@ -48,8 +51,9 @@ def extend_db_schema():
         CREATE TABLE IF NOT EXISTS user_reading_list (
             session_id TEXT,
             title TEXT,
+            goodreads_id TEXT,
             added_at DATETIME,
-            UNIQUE(session_id, title)
+            UNIQUE(session_id, goodreads_id)
         )
         """)
         
@@ -64,13 +68,14 @@ def extend_db_schema():
         logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
-def save_to_reading_list(session_id: str, title: str) -> bool:
+def save_to_reading_list(session_id: str, title: str, goodreads_id: str = "") -> bool:
     """
     Save a book to the user's reading list.
     
     Args:
         session_id: User's session ID
         title: Title of the book to save
+        goodreads_id: Goodreads ID of the book (optional)
         
     Returns:
         Boolean indicating success
@@ -80,27 +85,37 @@ def save_to_reading_list(session_id: str, title: str) -> bool:
         return False
     
     try:
+        # If no Goodreads ID provided, try to get it
+        if not goodreads_id:
+            # Try to get the book from the database
+            book = get_book_by_title(title)
+            if book and book.goodreads_id:
+                goodreads_id = book.goodreads_id
+            else:
+                # Try to scrape it
+                _, goodreads_id = get_book_cover(title)
+        
         # Connect to the database
-        conn = sqlite3.connect("user_history.db")
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_history.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         # Insert or replace the entry
         cursor.execute(
-            "INSERT OR REPLACE INTO user_reading_list (session_id, title, added_at) VALUES (?, ?, ?)",
-            (session_id, title, datetime.now())
+            "INSERT OR REPLACE INTO user_reading_list (session_id, title, goodreads_id, added_at) VALUES (?, ?, ?, ?)",
+            (session_id, title, goodreads_id, datetime.now())
         )
         
         # Commit changes and close connection
         conn.commit()
         conn.close()
         
-        logger.info(f"Saved '{title}' to reading list for session {session_id}")
+        logger.info(f"Saved '{title}' (ID: {goodreads_id}) to reading list for session {session_id}")
         
         # Invalidate cache for this book
         cache_key = f"{session_id}_{title}"
         if cache_key in book_cache:
             del book_cache[cache_key]
-            logger.info(f"Invalidated cache for book: {title}")
         
         return True
     except Exception as e:
@@ -108,39 +123,57 @@ def save_to_reading_list(session_id: str, title: str) -> bool:
         logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
-def is_in_reading_list(session_id: str, title: str) -> bool:
+def is_in_reading_list(session_id: str, title: str, goodreads_id: str = "") -> bool:
     """
     Check if a book is in the user's reading list.
     
     Args:
         session_id: User's session ID
         title: Title of the book to check
+        goodreads_id: Goodreads ID of the book (optional)
         
     Returns:
         Boolean indicating if the book is saved
     """
-    if not session_id or not title:
+    if not session_id:
         return False
+    
+    # Check cache first
+    cache_key = f"{session_id}_{title}"
+    if cache_key in book_cache:
+        return book_cache[cache_key].get('is_saved', False)
     
     try:
         # Connect to the database
-        conn = sqlite3.connect("user_history.db")
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_history.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
-        # Check if the entry exists
-        cursor.execute(
-            "SELECT 1 FROM user_reading_list WHERE session_id = ? AND title = ?",
-            (session_id, title)
-        )
+        # If we have a Goodreads ID, use it for the check
+        if goodreads_id:
+            cursor.execute(
+                "SELECT COUNT(*) FROM user_reading_list WHERE session_id = ? AND goodreads_id = ?",
+                (session_id, goodreads_id)
+            )
+        else:
+            # Fall back to title-based check
+            cursor.execute(
+                "SELECT COUNT(*) FROM user_reading_list WHERE session_id = ? AND title = ?",
+                (session_id, title)
+            )
         
-        result = cursor.fetchone() is not None
-        
-        # Close connection
+        count = cursor.fetchone()[0]
         conn.close()
         
-        return result
+        # Cache the result
+        if cache_key not in book_cache:
+            book_cache[cache_key] = {}
+        book_cache[cache_key]['is_saved'] = count > 0
+        
+        return count > 0
     except Exception as e:
         logger.error(f"Error checking reading list: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
 def get_book_details(title: str, session_id: str = None) -> Optional[Dict]:
@@ -453,6 +486,79 @@ def parse_related_books(text: str) -> List[Dict]:
             related_books.append(book)
     
     return related_books
+
+def get_reading_list(session_id: str) -> list:
+    """
+    Get the user's reading list.
+    
+    Args:
+        session_id: The user's session ID
+        
+    Returns:
+        A list of LiteratureItem objects representing the books in the reading list
+    """
+    if not session_id:
+        logger.warning("Missing session_id for get_reading_list")
+        return []
+    
+    try:
+        # Connect to the database
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_history.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Query the saved_books table instead of user_reading_list
+        cursor.execute("""
+        SELECT title, goodreads_id, author, status, progress, added_date FROM saved_books
+        WHERE session_id = ?
+        ORDER BY added_date DESC
+        """, (session_id,))
+        
+        results = cursor.fetchall()
+        conn.close()
+        
+        if not results:
+            logger.info(f"No books in reading list for session {session_id}")
+            return []
+        
+        # Get details for each book
+        books = []
+        for title, goodreads_id, author, status, progress, added_date in results:
+            # Get book cover image URL
+            image_url = ""
+            if goodreads_id:
+                # Try to get image from book_images table
+                try:
+                    conn = sqlite3.connect(db_path)
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT image_url FROM book_images WHERE goodreads_id = ?",
+                        (goodreads_id,)
+                    )
+                    img_row = cursor.fetchone()
+                    if img_row:
+                        image_url = img_row[0]
+                    conn.close()
+                except Exception as e:
+                    logger.error(f"Error getting book cover: {str(e)}")
+            
+            # Create a book item with the data we have
+            book = LiteratureItem(
+                title=title,
+                author=author,
+                goodreads_id=goodreads_id,
+                image_url=image_url,
+                status=status,
+                progress=progress
+            )
+            books.append(book)
+        
+        return books
+        
+    except Exception as e:
+        logger.error(f"Error getting reading list: {str(e)}")
+        logger.error(traceback.format_exc())
+        return []
 
 # Initialize the extended database schema
 extend_db_schema()
