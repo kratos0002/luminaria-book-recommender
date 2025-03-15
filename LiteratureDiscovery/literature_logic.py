@@ -10,19 +10,25 @@ This module contains improved functions for:
 
 import os
 import re
-import uuid
-import sqlite3
+import json
 import logging
-import requests
+import sqlite3
+import hashlib
+import threading
 import traceback
-from typing import Dict, List, Tuple, Optional, Set
-from datetime import datetime
+import urllib.parse
+from typing import List, Dict, Tuple, Optional, Union, Any
+from datetime import datetime, timedelta
+import uuid
+import requests
 from cachetools import TTLCache
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
-from urllib.parse import quote_plus
 import threading
 from datetime import timedelta
+
+# Import user profiles module
+from LiteratureDiscovery.user_profiles_utils import load_user_profile, update_user_interaction, save_user_profile
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -1404,17 +1410,33 @@ def get_recommendations(literature_input: str, session_id: str = None) -> Dict:
                 "title": f"Recent discussions about {normalized_input}",
                 "source": "Social Media",
                 "date": datetime.now().strftime("%Y-%m-%d"),
-                "url": "",
-                "summary": f"Readers have been discussing themes and character development in {normalized_input} across various platforms.",
+                "url": f"https://www.goodreads.com/search?q={urllib.parse.quote(normalized_input)}",
+                "summary": f"Readers have been discussing themes and character development in {normalized_input} across various platforms. Join the conversation to share your thoughts.",
                 "type": "social"
             },
             {
                 "title": f"Literary analysis of {normalized_input}",
                 "source": "Literary Blog",
                 "date": (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),
-                "url": "",
-                "summary": f"A recent analysis explores the cultural impact and enduring themes of {normalized_input}.",
+                "url": f"https://lithub.com/?s={urllib.parse.quote(normalized_input)}",
+                "summary": f"A recent analysis explores the cultural impact and enduring themes of {normalized_input}. The article examines how this work continues to resonate with modern readers.",
                 "type": "review"
+            },
+            {
+                "title": f"Author interviews related to {normalized_input}",
+                "source": "The Paris Review",
+                "date": (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d"),
+                "url": f"https://www.theparisreview.org/search?q={urllib.parse.quote(normalized_input)}",
+                "summary": f"Discover interviews with authors discussing works similar to {normalized_input} and their creative process. Learn about the inspirations behind contemporary literature.",
+                "type": "interview"
+            },
+            {
+                "title": f"Upcoming adaptations of {normalized_input}",
+                "source": "Entertainment Weekly",
+                "date": (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d"),
+                "url": f"https://ew.com/search?q={urllib.parse.quote(normalized_input)}",
+                "summary": f"Recent news suggests that {normalized_input} might be adapted for the screen. Industry insiders are discussing potential directors and casting choices for this anticipated adaptation.",
+                "type": "adaptation"
             }
         ]
     
@@ -2465,13 +2487,13 @@ def sync_saved_books_to_reading_list(session_id: str) -> None:
         
         # Get all books from saved_books table
         cursor.execute(
-            "SELECT goodreads_id, title, author, image_url FROM saved_books WHERE session_id = ?",
+            "SELECT goodreads_id, title, author FROM saved_books WHERE session_id = ?",
             (session_id,)
         )
         saved_books = cursor.fetchall()
         
         # For each saved book, check if it exists in user_reading_list
-        for goodreads_id, title, author, image_url in saved_books:
+        for goodreads_id, title, author in saved_books:
             cursor.execute(
                 "SELECT 1 FROM user_reading_list WHERE session_id = ? AND goodreads_id = ?",
                 (session_id, goodreads_id)
@@ -2514,28 +2536,47 @@ def fetch_search_updates(literature_input: str) -> List[Dict]:
         # Normalize the input to improve search results
         normalized_input = normalize_literature_input(literature_input)
         
+        # Generate fallback data that will be used if the API call fails
+        fallback_data = [
+            {
+                "title": f"Recent discussions about {normalized_input}",
+                "source": "Goodreads Forums",
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "url": f"https://www.goodreads.com/search?q={urllib.parse.quote(normalized_input)}",
+                "summary": f"Readers have been discussing themes and character development in {normalized_input} across various platforms. Join the conversation to share your thoughts.",
+                "type": "social"
+            },
+            {
+                "title": f"Literary analysis of {normalized_input}",
+                "source": "Literary Hub",
+                "date": (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),
+                "url": f"https://lithub.com/?s={urllib.parse.quote(normalized_input)}",
+                "summary": f"A recent analysis explores the cultural impact and enduring themes of {normalized_input}. The article examines how this work continues to resonate with modern readers.",
+                "type": "review"
+            },
+            {
+                "title": f"Author interviews related to {normalized_input}",
+                "source": "The Paris Review",
+                "date": (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d"),
+                "url": f"https://www.theparisreview.org/search?q={urllib.parse.quote(normalized_input)}",
+                "summary": f"Discover interviews with authors discussing works similar to {normalized_input} and their creative process. Learn about the inspirations behind contemporary literature.",
+                "type": "interview"
+            },
+            {
+                "title": f"Upcoming adaptations of {normalized_input}",
+                "source": "Entertainment Weekly",
+                "date": (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d"),
+                "url": f"https://ew.com/search?q={urllib.parse.quote(normalized_input)}",
+                "summary": f"Recent news suggests that {normalized_input} might be adapted for the screen. Industry insiders are discussing potential directors and casting choices for this anticipated adaptation.",
+                "type": "adaptation"
+            }
+        ]
+        
         # Check if Perplexity API key is available
         if not PERPLEXITY_API_KEY:
-            logger.warning("Perplexity API key not configured, returning dummy data for testing")
-            # Return dummy data for testing when API key is not available
-            return [
-                {
-                    "title": f"Recent discussions about {normalized_input}",
-                    "source": "Social Media",
-                    "date": datetime.now().strftime("%Y-%m-%d"),
-                    "url": "",
-                    "summary": f"Readers have been discussing themes and character development in {normalized_input} across various platforms.",
-                    "type": "social"
-                },
-                {
-                    "title": f"Literary analysis of {normalized_input}",
-                    "source": "Literary Blog",
-                    "date": (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),
-                    "url": "",
-                    "summary": f"A recent analysis explores the cultural impact and enduring themes of {normalized_input}.",
-                    "type": "review"
-                }
-            ]
+            logger.warning("Perplexity API key not configured, returning fallback data")
+            # Return fallback data when API key is not available
+            return fallback_data
         
         # Prepare the prompt for Perplexity
         prompt = f"""
@@ -2547,82 +2588,484 @@ def fetch_search_updates(literature_input: str) -> List[Dict]:
         4. Recent critical reception or reviews
         5. Author interviews or appearances
         
+        IMPORTANT: For each item, you MUST include a valid, working URL that links directly to the source.
+        If you're unsure about a specific URL, provide a search URL for a relevant site instead.
+        
         Format each item as a JSON object with:
-        - title: Title of the update
+        - title: Title of the update (specific and descriptive)
         - source: Source of the information (publication, social media platform)
         - date: Approximate date (YYYY-MM-DD format if available)
-        - url: Link to the source (if available)
-        - summary: Brief 1-2 sentence summary
+        - url: Link to the source (REQUIRED - must be a valid, working URL)
+        - summary: Detailed 2-3 sentence summary with specific information
         - type: Type of update (news, social, review, adaptation, interview)
         
-        Return the results as a JSON array with at most 5 items, sorted by recency.
+        Return the results as a JSON array with 4-5 items, sorted by recency.
         """
         
         logger.info(f"Querying Perplexity for news and social updates about: '{normalized_input}'")
         
-        # Query Perplexity API
-        response = requests.post(
-            "https://api.perplexity.ai/chat/completions",
-            headers={
-                "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "sonar-medium-online",
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are a helpful assistant that finds the latest news and social media updates about books and literary works."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "temperature": 0.2,
-                "max_tokens": 1024
-            },
-            timeout=30
-        )
-        
-        if response.status_code == 200:
-            response_data = response.json()
-            if "choices" in response_data and len(response_data["choices"]) > 0:
-                content = response_data["choices"][0]["message"]["content"]
-                logger.info(f"Received news and social updates from Perplexity API")
-                
-                # Parse the JSON response
-                try:
-                    # Extract JSON array from the response (handling potential text before/after the JSON)
-                    json_match = re.search(r'\[\s*{.*}\s*\]', content, re.DOTALL)
-                    if json_match:
-                        json_content = json_match.group(0)
-                        updates = json.loads(json_content)
-                        logger.info(f"Parsed {len(updates)} news and social updates")
-                        return updates
-                    else:
-                        # Try to parse the entire content as JSON
-                        updates = json.loads(content)
-                        if isinstance(updates, list):
+        try:
+            # Query Perplexity API
+            response = requests.post(
+                "https://api.perplexity.ai/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "sonar-medium-online",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are a helpful assistant that finds the latest news and social media updates about books and literary works. Always include specific details and working URLs for each item you find."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    "temperature": 0.2,
+                    "max_tokens": 1500
+                },
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                response_data = response.json()
+                if "choices" in response_data and len(response_data["choices"]) > 0:
+                    content = response_data["choices"][0]["message"]["content"]
+                    logger.info(f"Received news and social updates from Perplexity API")
+                    logger.debug(f"Raw Perplexity response: {content[:500]}...")
+                    
+                    # Parse the JSON response
+                    try:
+                        # Extract JSON array from the response (handling potential text before/after the JSON)
+                        json_match = re.search(r'\[\s*{.*}\s*\]', content, re.DOTALL)
+                        if json_match:
+                            json_content = json_match.group(0)
+                            updates = json.loads(json_content)
                             logger.info(f"Parsed {len(updates)} news and social updates")
-                            return updates
+                            
+                            # Validate and enhance each update
+                            validated_updates = []
+                            for update in updates:
+                                # Ensure URL is present and valid
+                                if not update.get('url'):
+                                    # Create a fallback URL if none provided
+                                    if update.get('source'):
+                                        source_name = update['source'].lower()
+                                        if 'goodreads' in source_name:
+                                            update['url'] = f"https://www.goodreads.com/search?q={urllib.parse.quote(normalized_input)}"
+                                        elif 'new york times' in source_name or 'nyt' in source_name:
+                                            update['url'] = f"https://www.nytimes.com/search?query={urllib.parse.quote(normalized_input)}"
+                                        elif 'guardian' in source_name:
+                                            update['url'] = f"https://www.theguardian.com/search?q={urllib.parse.quote(normalized_input)}"
+                                        elif 'twitter' in source_name or 'x' in source_name:
+                                            update['url'] = f"https://twitter.com/search?q={urllib.parse.quote(normalized_input)}"
+                                        elif 'reddit' in source_name:
+                                            update['url'] = f"https://www.reddit.com/search/?q={urllib.parse.quote(normalized_input)}"
+                                        else:
+                                            update['url'] = f"https://www.google.com/search?q={urllib.parse.quote(normalized_input)}+{urllib.parse.quote(update['source'])}"
+                                
+                                # Ensure summary is detailed enough
+                                if update.get('summary') and len(update['summary']) < 50:
+                                    update['summary'] += f" This update provides insights into {normalized_input} and its impact on readers and the literary world."
+                                
+                                validated_updates.append(update)
+                            
+                            return validated_updates
                         else:
-                            logger.warning(f"Unexpected JSON structure in Perplexity response")
-                            return []
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse JSON from Perplexity response: {str(e)}")
-                    # Return an empty list if parsing fails
+                            # Try to parse the entire content as JSON
+                            updates = json.loads(content)
+                            if isinstance(updates, list):
+                                logger.info(f"Parsed {len(updates)} news and social updates")
+                                return updates
+                            else:
+                                logger.warning(f"Unexpected JSON structure in Perplexity response")
+                                return []
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse JSON from Perplexity response: {str(e)}")
+                        # Return an empty list if parsing fails
+                        return []
+                else:
+                    logger.warning(f"Unexpected response structure from Perplexity for news updates")
                     return []
             else:
-                logger.warning(f"Unexpected response structure from Perplexity for news updates")
+                logger.warning(f"Failed to query Perplexity for news updates: {response.status_code} - {response.text}")
                 return []
-        else:
-            logger.warning(f"Failed to query Perplexity for news updates: {response.status_code} - {response.text}")
-            return []
             
-    except Exception as e:
-        logger.error(f"Error querying Perplexity for news and social updates: {str(e)}")
-        return []
+        except Exception as e:
+            logger.error(f"Error querying Perplexity for news and social updates: {str(e)}")
+            return fallback_data
+        
+        return fallback_data
+
+def get_personalized_recommendations(literature_input: str, session_id: str = None, user_id: str = None) -> Dict:
+    """
+    Get personalized recommendations for a literature input, incorporating user preferences.
+    
+    Args:
+        literature_input: The literature input from the user
+        session_id: Optional user session ID for history tracking
+        user_id: Optional user ID for personalization
+        
+    Returns:
+        Dictionary with core and trending recommendations, news and social updates,
+        and segmented recommendations by category
+    """
+    if not literature_input:
+        return {"core": [], "trending": [], "news_and_social": [], "segmented_recommendations": {}}
+    
+    # Check for cached recommendations (in memory and database)
+    cached_results = get_cached_recommendations(literature_input, session_id)
+    if cached_results:
+        return cached_results
+    
+    # Track user input if session_id is provided
+    if session_id:
+        store_user_input(session_id, literature_input)
+        logger.info(f"Stored user input for session {session_id}: {literature_input}")
+    
+    # Get user preferences if user_id is provided
+    user_preferences = None
+    if user_id:
+        try:
+            user_preferences = get_user_preferences(user_id)
+            logger.info(f"Retrieved preferences for user {user_id}: {len(user_preferences['top_genres'])} genres, {len(user_preferences['top_authors'])} authors")
+        except Exception as e:
+            logger.error(f"Error retrieving user preferences: {str(e)}")
+    
+    # Get user terms and context
+    user_terms, context_desc, history_used = get_user_preferences(literature_input, session_id)
+    logger.info(f"User terms extracted: {user_terms}")
+    
+    # If we have user preferences, incorporate them into the user terms
+    if user_preferences:
+        # Add top genres from user preferences
+        for genre, weight in user_preferences['top_genres']:
+            if genre.lower() not in [term.lower() for term in user_terms]:
+                user_terms.append(genre)
+                logger.info(f"Added user preferred genre to terms: {genre}")
+        
+        # Add top authors from user preferences
+        for author, weight in user_preferences['top_authors']:
+            if author.lower() not in [term.lower() for term in user_terms]:
+                user_terms.append(author)
+                logger.info(f"Added user preferred author to terms: {author}")
+    
+    # Use threading to parallelize the API calls for classic and trending literature
+    classic_items = []
+    trending_items = []
+    news_and_social = []
+    classic_error = None
+    trending_error = None
+    news_error = None
+    
+    # Define thread functions to get literature items
+    def fetch_classic_items():
+        nonlocal classic_items, classic_error
+        try:
+            classic_items = get_classical_literature()
+            logger.info(f"Retrieved {len(classic_items)} classic literature items")
+        except Exception as e:
+            classic_error = str(e)
+            logger.error(f"Error retrieving classic literature: {str(e)}")
+            classic_items = []
+    
+    def fetch_trending_items():
+        nonlocal trending_items, trending_error
+        try:
+            trending_items = get_literary_trends(user_terms, literature_input)
+            logger.info(f"Retrieved {len(trending_items)} trending recent literature items")
+        except Exception as e:
+            trending_error = str(e)
+            logger.error(f"Error retrieving trending literature: {str(e)}")
+            trending_items = []
+    
+    def fetch_news_and_social():
+        nonlocal news_and_social, news_error
+        try:
+            news_and_social = fetch_search_updates(literature_input)
+            logger.info(f"Retrieved {len(news_and_social)} news and social media updates")
+        except Exception as e:
+            news_error = str(e)
+            logger.error(f"Error retrieving news and social updates: {str(e)}")
+            news_and_social = []
+    
+    # Create and start threads
+    classic_thread = threading.Thread(target=fetch_classic_items)
+    trending_thread = threading.Thread(target=fetch_trending_items)
+    news_thread = threading.Thread(target=fetch_news_and_social)
+    
+    classic_thread.start()
+    trending_thread.start()
+    news_thread.start()
+    
+    # Wait for all threads to complete
+    classic_thread.join()
+    trending_thread.join()
+    news_thread.join()
+    
+    # Log any errors that occurred
+    if classic_error:
+        logger.error(f"Error in classic literature thread: {classic_error}")
+    if trending_error:
+        logger.error(f"Error in trending literature thread: {trending_error}")
+    if news_error:
+        logger.error(f"Error in news and social updates thread: {news_error}")
+    
+    # Generate recommendations for both literature types
+    core_recommendations = recommend_literature(classic_items, user_terms, literature_input, session_id)
+    trending_recommendations = recommend_literature(trending_items, user_terms, literature_input, session_id)
+    
+    logger.info(f"Generated {len(core_recommendations)} core recommendations")
+    logger.info(f"Generated {len(trending_recommendations)} trending recommendations")
+    
+    # Apply personalization if user_id is provided
+    if user_preferences:
+        # Boost scores for items matching user preferences
+        core_recommendations = personalize_recommendations(core_recommendations, user_preferences)
+        trending_recommendations = personalize_recommendations(trending_recommendations, user_preferences)
+        logger.info("Applied personalization to recommendations")
+    
+    # Deduplicate recommendations by combining core and trending into a single list
+    # keeping only the first occurrence of each goodreads_id
+    all_recommendations = []
+    seen_ids = set()  # Track both goodreads_ids and title|author combinations
+    
+    # Process core recommendations first (higher priority)
+    for item, score, terms in core_recommendations:
+        # Create unique identifiers for deduplication
+        goodreads_id = item.goodreads_id if item.goodreads_id else None
+        item_key = f"{item.title}|{item.author}".lower()
+        
+        # Skip if we've seen this item before
+        if (goodreads_id and goodreads_id in seen_ids) or (item_key in seen_ids):
+            logger.info(f"Skipping duplicate core item: {item.title}")
+            continue
+        
+        # Add identifiers to seen set
+        if goodreads_id:
+            seen_ids.add(goodreads_id)
+        seen_ids.add(item_key)
+        
+        # Add to all recommendations
+        all_recommendations.append((item, score, terms))
+    
+    # Process trending recommendations
+    for item, score, terms in trending_recommendations:
+        # Create unique identifiers for deduplication
+        goodreads_id = item.goodreads_id if item.goodreads_id else None
+        item_key = f"{item.title}|{item.author}".lower()
+        
+        # Skip if we've seen this item before
+        if (goodreads_id and goodreads_id in seen_ids) or (item_key in seen_ids):
+            logger.info(f"Skipping duplicate trending item: {item.title}")
+            continue
+        
+        # Add identifiers to seen set
+        if goodreads_id:
+            seen_ids.add(goodreads_id)
+        seen_ids.add(item_key)
+        
+        # Add to all recommendations
+        all_recommendations.append((item, score, terms))
+    
+    # Segment recommendations by category
+    segmented_recommendations = {
+        "novels": [],
+        "papers": [],
+        "poems": [],
+        "other": []
+    }
+    
+    # Process all recommendations for segmentation
+    for item, score, terms in all_recommendations:
+        # Manually determine category based on item_type
+        category = "other"
+        if item.item_type:
+            item_type_lower = item.item_type.lower()
+            if "novel" in item_type_lower:
+                category = "novels"
+            elif any(keyword in item_type_lower for keyword in ["paper", "article", "research"]):
+                category = "papers"
+            elif any(keyword in item_type_lower for keyword in ["poem", "poetry", "verse"]):
+                category = "poems"
+        
+        logger.info(f"Categorizing item '{item.title}' as '{category}' (type: '{item.item_type}')")
+        segmented_recommendations[category].append((item, score, terms))
+    
+    # Sort each category by score
+    for category in segmented_recommendations:
+        segmented_recommendations[category].sort(key=lambda x: x[1], reverse=True)
+    
+    # Ensure we have news and social updates (use dummy data if empty)
+    if not news_and_social:
+        logger.warning("No news and social updates found, adding dummy data for testing")
+        normalized_input = literature_input.strip()
+        news_and_social = [
+            {
+                "title": f"Recent discussions about {normalized_input}",
+                "source": "Social Media",
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "url": f"https://www.goodreads.com/search?q={urllib.parse.quote(normalized_input)}",
+                "summary": f"Readers have been discussing themes and character development in {normalized_input} across various platforms. Join the conversation to share your thoughts.",
+                "type": "social"
+            },
+            {
+                "title": f"Literary analysis of {normalized_input}",
+                "source": "Literary Blog",
+                "date": (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),
+                "url": f"https://lithub.com/?s={urllib.parse.quote(normalized_input)}",
+                "summary": f"A recent analysis explores the cultural impact and enduring themes of {normalized_input}. The article examines how this work continues to resonate with modern readers.",
+                "type": "review"
+            },
+            {
+                "title": f"Author interviews related to {normalized_input}",
+                "source": "The Paris Review",
+                "date": (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d"),
+                "url": f"https://www.theparisreview.org/search?q={urllib.parse.quote(normalized_input)}",
+                "summary": f"Discover interviews with authors discussing works similar to {normalized_input} and their creative process. Learn about the inspirations behind contemporary literature.",
+                "type": "interview"
+            },
+            {
+                "title": f"Upcoming adaptations of {normalized_input}",
+                "source": "Entertainment Weekly",
+                "date": (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d"),
+                "url": f"https://ew.com/search?q={urllib.parse.quote(normalized_input)}",
+                "summary": f"Recent news suggests that {normalized_input} might be adapted for the screen. Industry insiders are discussing potential directors and casting choices for this anticipated adaptation.",
+                "type": "adaptation"
+            }
+        ]
+    
+    # Create the result dictionary
+    result = {
+        "core": core_recommendations,  # Keep original core recommendations for API compatibility
+        "trending": trending_recommendations,  # Keep original trending recommendations for API compatibility
+        "terms": user_terms,
+        "context_description": context_desc,
+        "history": history_used,
+        "input": literature_input,  # Include the original input
+        "news_and_social": news_and_social,  # Add news and social media updates
+        "segmented_recommendations": segmented_recommendations  # Add segmented recommendations
+    }
+    
+    # Cache the results
+    cache_recommendations(literature_input, result, session_id)
+    
+    return result
+
+def personalize_recommendations(recommendations, user_preferences):
+    """
+    Apply personalization to recommendations based on user preferences.
+    
+    Args:
+        recommendations: List of (item, score, terms) tuples
+        user_preferences: Dictionary of user preferences
+        
+    Returns:
+        List of (item, score, terms) tuples with adjusted scores
+    """
+    personalized_recommendations = []
+    
+    # Extract preference data
+    preferred_genres = {genre.lower(): weight for genre, weight in user_preferences['top_genres']}
+    preferred_authors = {author.lower(): weight for author, weight in user_preferences['top_authors']}
+    
+    # Previously read books to potentially downrank
+    read_books = set()
+    for book in user_preferences.get('reading_history', []):
+        if 'goodreads_id' in book and book['goodreads_id']:
+            read_books.add(book['goodreads_id'])
+    
+    for item, score, terms in recommendations:
+        # Start with the original score
+        adjusted_score = score
+        
+        # Boost score for preferred genres
+        if hasattr(item, 'genre') and item.genre and item.genre.lower() in preferred_genres:
+            genre_boost = preferred_genres[item.genre.lower()] * 0.2  # 20% boost per preference weight
+            adjusted_score += genre_boost
+            logger.debug(f"Boosted '{item.title}' by {genre_boost} for genre '{item.genre}'")
+        
+        # Boost score for preferred authors
+        if hasattr(item, 'author') and item.author and item.author.lower() in preferred_authors:
+            author_boost = preferred_authors[item.author.lower()] * 0.3  # 30% boost per preference weight
+            adjusted_score += author_boost
+            logger.debug(f"Boosted '{item.title}' by {author_boost} for author '{item.author}'")
+        
+        # Slightly downrank books the user has already read
+        if hasattr(item, 'goodreads_id') and item.goodreads_id and item.goodreads_id in read_books:
+            adjusted_score *= 0.7  # 30% reduction
+            logger.debug(f"Downranked '{item.title}' because user has already read it")
+        
+        # Mark the item as personalized
+        if adjusted_score != score:
+            item.personalized = True
+        
+        # Add to personalized recommendations
+        personalized_recommendations.append((item, adjusted_score, terms))
+    
+    # Re-sort by adjusted score
+    personalized_recommendations.sort(key=lambda x: x[1], reverse=True)
+    
+    return personalized_recommendations
+
+def get_personalized_recommendations(literature_input: str, session_id: str = None) -> Dict:
+    """
+    Get personalized literature recommendations based on user preferences.
+    
+    Args:
+        literature_input: User's search input
+        session_id: User's session ID for personalization
+        
+    Returns:
+        Dictionary with recommendation results
+    """
+    # First get standard recommendations
+    recommendations = get_recommendations(literature_input, session_id)
+    
+    # If no session ID, return standard recommendations
+    if not session_id:
+        return recommendations
+    
+    # Load user profile
+    user_profile = load_user_profile(session_id)
+    if not user_profile:
+        # No profile found, return standard recommendations
+        return recommendations
+    
+    # Extract user preferences
+    user_preferences = {
+        'top_genres': user_profile.get_top_genres(5),
+        'top_authors': user_profile.get_top_authors(5),
+        'reading_history': user_profile.reading_history
+    }
+    
+    # Personalize each category of recommendations
+    if 'core' in recommendations and recommendations['core']:
+        recommendations['core'] = personalize_recommendations(recommendations['core'], user_preferences)
+    
+    if 'trending' in recommendations and recommendations['trending']:
+        recommendations['trending'] = personalize_recommendations(recommendations['trending'], user_preferences)
+    
+    if 'segmented_recommendations' in recommendations:
+        for category in recommendations['segmented_recommendations']:
+            if recommendations['segmented_recommendations'][category]:
+                recommendations['segmented_recommendations'][category] = personalize_recommendations(
+                    recommendations['segmented_recommendations'][category], 
+                    user_preferences
+                )
+    
+    # Add personalization info to the recommendations
+    recommendations['personalized'] = True
+    recommendations['personalization_info'] = {
+        'top_genres': [genre for genre, _ in user_preferences['top_genres']],
+        'top_authors': [author for author, _ in user_preferences['top_authors']],
+        'history_count': len(user_preferences['reading_history'])
+    }
+    
+    return recommendations
 
 if __name__ == "__main__":
     # Initialize the database

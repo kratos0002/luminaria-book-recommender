@@ -299,6 +299,154 @@ footer {
     border: 1px solid #f5d0da;
 }
 
+/* News & Social Updates Section */
+.news-card {
+    background-color: var(--card-background);
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #3498db;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.news-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.news-card .title {
+    font-size: 1.3rem;
+    margin-bottom: 0.8rem;
+    color: var(--primary-color);
+}
+
+.news-card .title a {
+    color: var(--primary-color);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.news-card .title a:hover {
+    color: var(--secondary-color);
+    text-decoration: underline;
+}
+
+.news-card .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    color: var(--text-light);
+}
+
+.news-card .source {
+    font-weight: 500;
+}
+
+.news-card .date {
+    color: #7f8c8d;
+}
+
+.news-card .news-type {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: white;
+    background-color: #95a5a6;
+}
+
+.news-card .news-type i {
+    margin-right: 4px;
+}
+
+.news-card .news-type-social {
+    background-color: #3498db;
+}
+
+.news-card .news-type-review {
+    background-color: #f39c12;
+}
+
+.news-card .news-type-news {
+    background-color: #2ecc71;
+}
+
+.news-card .news-type-interview {
+    background-color: #9b59b6;
+}
+
+.news-card .news-type-adaptation {
+    background-color: #e74c3c;
+}
+
+.news-card .summary {
+    margin-bottom: 1rem;
+    line-height: 1.5;
+    color: var(--text-color);
+}
+
+.news-card .news-link {
+    display: inline-block;
+    padding: 8px 16px;
+    background-color: #3498db;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+}
+
+.news-card .news-link:hover {
+    background-color: #2980b9;
+}
+
+/* Search Info Panel Styling */
+.search-info-panel {
+    background-color: var(--card-background);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #f1c40f;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.search-info-panel h4 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+.search-info-panel h4 i {
+    margin-right: 8px;
+    color: #f1c40f;
+}
+
+.search-info-panel p {
+    margin-bottom: 0.8rem;
+}
+
+.search-info-panel strong {
+    color: var(--primary-color);
+}
+
+.search-description {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    line-height: 1.6;
+}
+
+.notable-works {
+    margin: 0.5rem 0 1rem 1.5rem;
+}
+
+.notable-works li {
+    margin-bottom: 0.5rem;
+}
+
 /* Responsive styles */
 @media (min-width: 768px) {
     .recommendations {

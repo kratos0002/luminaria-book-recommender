@@ -492,6 +492,40 @@ nav a:hover::after {
     color: var(--text-muted);
 }
 
+/* Search Info Panel Styles */
+.search-info-panel {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-left: 3px solid #ffd700;
+}
+
+.search-info-panel h4 {
+    color: #ffd700;
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 1.1em;
+}
+
+.search-description {
+    font-size: 0.9em;
+    line-height: 1.5;
+    color: #e0e0e0;
+    margin-top: 12px;
+}
+
+.notable-works {
+    padding-left: 20px;
+    margin-top: 5px;
+    margin-bottom: 12px;
+}
+
+.notable-works li {
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+
 /* Animations */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
